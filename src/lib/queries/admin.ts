@@ -136,6 +136,8 @@ export type PendingAccount = {
   identifier: string | null;
   departmentCode: string | null;
   designation: string | null;
+  /** True for the signed-in admin's own row — they cannot decide on it. */
+  isSelf: boolean;
 };
 
 /** Cheap count for the sidebar badge — avoids loading the whole queue. */
@@ -160,6 +162,10 @@ export async function getAccountQueue(): Promise<{
   recent: PendingAccount[];
 }> {
   const supabase = createClient();
+
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
 
   // Students are included since migration 0008 — every role now needs
   // approval, so filtering them out here would hide most of the queue.
@@ -208,6 +214,7 @@ export async function getAccountQueue(): Promise<{
       departmentCode:
         student?.department_code ?? faculty?.department_code ?? null,
       designation: faculty?.designation ?? admin?.designation ?? null,
+      isSelf: account.id === currentUser?.id,
     };
   });
 
