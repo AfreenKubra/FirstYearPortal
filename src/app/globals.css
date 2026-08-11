@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-parchment text-ink font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight text-indigo-950;
+  }
+
+  /*
+   * Global visible focus (PRD section 6, accessibility). Applied via
+   * :focus-visible so pointer users don't see rings on click, but every
+   * keyboard user always does — on every interactive element, without each
+   * component having to remember.
+   */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brass-400 ring-offset-2 ring-offset-parchment;
+  }
+}
+
+@layer utilities {
+  .rule {
+    @apply border-t border-indigo-100;
+  }
+}
+
+/* PRD section 6: respect prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

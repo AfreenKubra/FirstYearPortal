@@ -1,0 +1,138 @@
+import type { Metadata } from "next";
+import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
+import { AccountDecision } from "@/components/admin/AccountDecision";
+import { getAccountQueue } from "@/lib/queries/admin";
+
+export const metadata: Metadata = { title: "Account approvals" };
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "border-warning/30 bg-warning/5 text-warning",
+  active: "border-success/30 bg-success/5 text-success",
+  rejected: "border-danger/30 bg-danger/5 text-danger",
+  suspended: "border-danger/30 bg-danger/5 text-danger",
+};
+
+function StatusPill({ status }: { status: string }) {
+  return (
+    <span
+      className={[
+        "rounded-md border px-2 py-1 text-xs font-medium capitalize",
+        STATUS_STYLES[status] ?? "border-indigo-100 bg-indigo-50 text-indigo-800",
+      ].join(" ")}
+    >
+      {status}
+    </span>
+  );
+}
+
+function AccountCard({
+  account,
+}: {
+  account: {
+    userId: string;
+    email: string;
+    role: string;
+    status: string;
+    createdAt: string;
+    fullName: string | null;
+    employeeCode: string | null;
+    departmentCode: string | null;
+    designation: string | null;
+  };
+}) {
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-4 py-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-medium text-indigo-950">
+            {account.fullName ?? account.email}
+          </p>
+          <StatusPill status={account.status} />
+          <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs font-medium capitalize text-indigo-800">
+            {account.role}
+          </span>
+        </div>
+        <p className="mt-1 break-all text-sm text-ink-muted">{account.email}</p>
+        <p className="mt-0.5 text-xs text-ink-faint">
+          {[
+            account.designation,
+            account.departmentCode,
+            account.employeeCode,
+            `Requested ${new Date(account.createdAt).toLocaleDateString()}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {!account.fullName && (
+          <p className="mt-1 text-xs text-warning">
+            No staff profile attached — this account signed up but never
+            completed its record.
+          </p>
+        )}
+      </div>
+
+      <AccountDecision userId={account.userId} status={account.status} />
+    </li>
+  );
+}
+
+export default async function AdminAccountsPage() {
+  const { pending, recent } = await getAccountQueue();
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <header>
+        <h1 className="text-2xl text-indigo-950 sm:text-3xl">
+          Account approvals
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          Faculty and administrator accounts requested at{" "}
+          <span className="font-medium text-indigo-900">/register/staff</span>{" "}
+          stay inactive until approved here. Students are activated
+          automatically and never appear in this queue.
+        </p>
+      </header>
+
+      <Card as="section">
+        <CardHeader
+          title="Awaiting decision"
+          description={
+            pending.length === 0
+              ? undefined
+              : `${pending.length} account${pending.length === 1 ? "" : "s"} pending`
+          }
+        />
+        <CardBody className={pending.length === 0 ? undefined : "py-0"}>
+          {pending.length === 0 ? (
+            <EmptyState
+              title="Nothing waiting"
+              description="New faculty or administrator requests will appear here for approval."
+            />
+          ) : (
+            <ul className="divide-y divide-indigo-100">
+              {pending.map((account) => (
+                <AccountCard key={account.userId} account={account} />
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      {recent.length > 0 && (
+        <Card as="section">
+          <CardHeader
+            title="Recently decided"
+            description="Approved, rejected, or suspended accounts. You can still change these."
+          />
+          <CardBody className="py-0">
+            <ul className="divide-y divide-indigo-100">
+              {recent.map((account) => (
+                <AccountCard key={account.userId} account={account} />
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+    </div>
+  );
+}
