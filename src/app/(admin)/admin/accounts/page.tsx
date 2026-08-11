@@ -46,6 +46,7 @@ function AccountCard({
     identifier: string | null;
     departmentCode: string | null;
     designation: string | null;
+    isSelf: boolean;
   };
 }) {
   return (
@@ -83,6 +84,7 @@ function AccountCard({
         userId={account.userId}
         status={account.status}
         name={account.fullName ?? account.email}
+        isSelf={account.isSelf}
       />
     </li>
   );
