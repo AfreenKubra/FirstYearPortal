@@ -59,8 +59,9 @@ This portal exists to:
 | **Faculty** | Assigned mentors/department faculty | Find and understand assigned students; verify achievements; run assessments/events; mentor at scale |
 | **Admin** | Department heads, portal administrators | Institution-wide analytics, user/department management, oversight, reporting |
 
-Faculty and admin accounts are never self-service — they require explicit
-approval by an authorised admin (see Section 9, RBAC).
+No account is self-service. Students, faculty, and admins all register
+openly, but every account requires explicit approval by an authorised admin
+before it can be used (see Section 9, RBAC).
 
 ## 4. User stories by role
 
@@ -117,7 +118,14 @@ started** (spec'd in the original brief, no design work done yet).
   Supabase Auth.
 - Account status: `pending → active`, or `rejected`/`suspended`.
 - Last-login tracking; audit log for privileged actions.
-- Student self-registration is open; faculty/admin require admin approval.
+- **Every account requires admin approval — students included.** Registration
+  is open to anyone, but no account can be used until an administrator
+  approves it. A registrant's profile data is saved while they wait, so
+  approval lets them straight in with nothing to re-enter.
+  *(Changed from "student self-registration is open" by institutional
+  decision; see migration `0008_approve_all_registrations.sql`. The tradeoff
+  accepted: every first-year student now needs a manual decision, concentrated
+  in the first days of term.)*
 - **Shipped:** student registration, login, logout, forgot/reset password,
   role/status model, last-login tracking, audit-log table.
 - **Planned:** faculty/admin registration + admin approval queue, email

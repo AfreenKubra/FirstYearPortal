@@ -128,6 +128,7 @@ In the Supabase dashboard, open **SQL Editor** and run each file in
 | `0005_staff_registration.sql` | Lets a pending administrator create their own profile row |
 | `0006_email_sync.sql` | Keeps `users.email` in step with Supabase Auth |
 | `0007_residence_type.sql` | Replaces the two-value accommodation field with four residence types |
+| `0008_approve_all_registrations.sql` | Every new account starts `pending`, students included |
 
 Once `DATABASE_URL` is configured (below), later migrations can instead be
 applied with:

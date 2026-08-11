@@ -10,6 +10,8 @@ export type NavItem = {
   label: string;
   /** Modules from PRD 5.4–5.11 that are not built yet. */
   disabled?: boolean;
+  /** Count shown alongside the label, e.g. accounts awaiting approval. */
+  badge?: number;
 };
 
 /**
@@ -56,13 +58,26 @@ export function StudentNav({
               aria-current={active ? "page" : undefined}
               onClick={() => setOpen(false)}
               className={[
-                "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
                   ? "bg-indigo-800 text-parchment"
                   : "text-ink-muted hover:bg-indigo-50 hover:text-indigo-900",
               ].join(" ")}
             >
-              {item.label}
+              <span>{item.label}</span>
+              {item.badge !== undefined && item.badge > 0 && (
+                <span
+                  className={[
+                    "min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[0.6875rem] font-semibold tabular-nums",
+                    active
+                      ? "bg-parchment text-indigo-900"
+                      : "bg-brass-500 text-white",
+                  ].join(" ")}
+                >
+                  {item.badge > 99 ? "99+" : item.badge}
+                  <span className="sr-only"> awaiting action</span>
+                </span>
+              )}
             </Link>
           </li>
         );

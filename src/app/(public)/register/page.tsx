@@ -12,7 +12,7 @@ export default async function RegisterPage() {
   return (
     <AuthShell
       title="Create your student account"
-      subtitle="Three short steps. You can finish the rest of your profile after signing in."
+      subtitle="Three short steps. A portal administrator approves your account before you can sign in — everything you enter here is saved while you wait."
       aside={{
         heading: "Register once — the college stops asking for the same details on paper.",
         points: [

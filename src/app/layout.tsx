@@ -34,11 +34,7 @@ export default function RootLayout({
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body>
         {children}
-        {/*
-          Agentation annotation toolbar, development only. Loaded through
-          DevToolbar rather than imported directly — see the comment there for
-          why a static import would ship 429 KB of it to production.
-        */}
+        {/* Agentation annotation toolbar, development only */}
         {process.env.NODE_ENV === "development" && <DevToolbar />}
       </body>
     </html>

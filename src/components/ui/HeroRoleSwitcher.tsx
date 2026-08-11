@@ -47,7 +47,8 @@ export function HeroRoleSwitcher() {
             </ButtonLink>
           </div>
           <p className="text-xs text-ink-faint">
-            Self-service registration for all first-year HKBKCE students.
+            Open to all first-year HKBKCE students. A portal administrator
+            approves your account before you can sign in.
           </p>
         </div>
       ) : (

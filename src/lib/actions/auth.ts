@@ -134,7 +134,10 @@ export async function registerStudent(
     granted: true,
   });
 
-  redirect("/complete-profile");
+  // Since migration 0008 students also start 'pending', so middleware would
+  // bounce them off /complete-profile anyway. Sending them straight to the
+  // waiting page explains why, instead of showing an unexplained redirect.
+  redirect("/pending-approval");
 }
 
 export async function login(
