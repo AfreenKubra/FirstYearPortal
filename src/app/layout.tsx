@@ -1,0 +1,37 @@
+import type { Metadata } from "next";
+import { Fraunces, Inter } from "next/font/google";
+import { branding } from "@/config/branding";
+import "./globals.css";
+
+const display = Fraunces({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-display",
+  axes: ["SOFT", "WONK"],
+});
+
+const body = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-body",
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: `${branding.product.name} · ${branding.institution.shortName}`,
+    template: `%s · ${branding.product.name}`,
+  },
+  description: `${branding.product.tagline} portal for first-year students at ${branding.institution.name}.`,
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body>{children}</body>
+    </html>
+  );
+}
