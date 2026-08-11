@@ -12,15 +12,23 @@ const STATUS_STYLES: Record<string, string> = {
   suspended: "border-danger/30 bg-danger/5 text-danger",
 };
 
+/** `rejected` is the stored value; "Declined" is what an admin calls it. */
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Awaiting decision",
+  active: "Accepted",
+  rejected: "Declined",
+  suspended: "Suspended",
+};
+
 function StatusPill({ status }: { status: string }) {
   return (
     <span
       className={[
-        "rounded-md border px-2 py-1 text-xs font-medium capitalize",
+        "rounded-md border px-2 py-1 text-xs font-medium",
         STATUS_STYLES[status] ?? "border-indigo-100 bg-indigo-50 text-indigo-800",
       ].join(" ")}
     >
-      {status}
+      {STATUS_LABELS[status] ?? status}
     </span>
   );
 }
@@ -71,7 +79,11 @@ function AccountCard({
         )}
       </div>
 
-      <AccountDecision userId={account.userId} status={account.status} />
+      <AccountDecision
+        userId={account.userId}
+        status={account.status}
+        name={account.fullName ?? account.email}
+      />
     </li>
   );
 }

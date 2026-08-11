@@ -33,6 +33,8 @@ pnpm-debug.log*
 .claude/
 .mcp.json
 .agents/
+.codex/
+.gemini/
 skills-lock.json
 
 # os

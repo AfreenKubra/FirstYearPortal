@@ -114,14 +114,14 @@ export async function decideAccount(
   revalidatePath("/admin/accounts");
   revalidatePath("/admin");
 
-  const verb =
+  const outcome =
     parsed.data.decision === "active"
-      ? "approved"
+      ? "accepted — they can sign in now"
       : parsed.data.decision === "rejected"
-        ? "rejected"
-        : "suspended";
+        ? "declined — they cannot sign in"
+        : "suspended — they cannot sign in";
 
-  return { status: "success", message: `Account ${verb}.` };
+  return { status: "success", message: `Account ${outcome}.` };
 }
 
 // --- Departments ------------------------------------------------------------

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { branding } from "@/config/branding";
 import { registrationSchema } from "@/lib/validation/student";
 import {
   forgotPasswordSchema,
@@ -167,31 +168,51 @@ export async function login(
     return { status: "error", message: "Incorrect email or password." };
   }
 
-  // Last-login tracking (PRD 5.1).
-  await supabase
-    .from("users")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("id", data.user.id);
-
   const { data: account } = await supabase
     .from("users")
     .select("role, status")
     .eq("id", data.user.id)
     .single();
 
+  // Only an approved account gets a session.
+  //
+  // The credentials were correct, so Supabase has already issued one — it has
+  // to be revoked explicitly. Merely redirecting a pending or declined user
+  // would leave them holding a valid session and relying on middleware to
+  // fence them in on every subsequent request; signing them out means there
+  // is nothing to fence.
+  if (!account || account.status !== "active") {
+    await supabase.auth.signOut();
+
+    const reason =
+      account?.status === "pending"
+        ? "Your account is waiting for a portal administrator to approve it. " +
+          "You'll be able to sign in as soon as it's approved."
+        : account?.status === "rejected"
+          ? "This registration was not approved, so the account cannot be used."
+          : account?.status === "suspended"
+            ? "This account has been suspended and cannot be used."
+            : "This account is not set up correctly. Contact the portal administrator.";
+
+    return {
+      status: "error",
+      message: `${reason} If you think this is a mistake, contact ${branding.contacts.support}.`,
+    };
+  }
+
+  // Last-login tracking (PRD 5.1) — recorded only for logins that actually
+  // succeed, so the column means "last used" rather than "last attempted".
+  await supabase
+    .from("users")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", data.user.id);
+
   revalidatePath("/", "layout");
 
-  if (account?.status === "suspended" || account?.status === "rejected") {
-    redirect("/account-blocked");
-  }
-  if (account?.status === "pending") {
-    redirect("/pending-approval");
-  }
-
   redirect(
-    account?.role === "admin"
+    account.role === "admin"
       ? "/admin"
-      : account?.role === "faculty"
+      : account.role === "faculty"
         ? "/faculty"
         : "/dashboard",
   );

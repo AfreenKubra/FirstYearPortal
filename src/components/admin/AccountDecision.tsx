@@ -6,56 +6,86 @@ import { idleState } from "@/lib/actions/form-state";
 import { FormMessage } from "@/components/ui/FormStatus";
 
 /**
- * Approve / reject / suspend controls for one account.
+ * Decision controls for one account.
  *
- * Three separate submit buttons in one form, each carrying its own `decision`
- * value, rather than a dropdown plus a confirm — the destructive options stay
- * visibly distinct instead of hiding behind a neutral "Apply".
+ * Which buttons appear depends on where the account currently is:
+ *
+ *   pending    Accept | Decline
+ *   active     Suspend
+ *   rejected   Accept          (a declined registration can be reversed)
+ *   suspended  Reactivate
+ *
+ * Each action is its own submit button carrying its own `decision` value,
+ * rather than a dropdown plus a confirm — it keeps the destructive choice
+ * visibly distinct from the routine one instead of hiding both behind a
+ * neutral "Apply".
  */
+
+type Decision = "active" | "rejected" | "suspended";
+
+type Action = {
+  decision: Decision;
+  label: string;
+  tone: "accept" | "danger";
+};
+
+function actionsFor(status: string): Action[] {
+  switch (status) {
+    case "pending":
+      return [
+        { decision: "active", label: "Accept", tone: "accept" },
+        { decision: "rejected", label: "Decline", tone: "danger" },
+      ];
+    case "active":
+      return [{ decision: "suspended", label: "Suspend", tone: "danger" }];
+    case "rejected":
+      return [{ decision: "active", label: "Accept", tone: "accept" }];
+    case "suspended":
+      return [{ decision: "active", label: "Reactivate", tone: "accept" }];
+    default:
+      return [{ decision: "active", label: "Accept", tone: "accept" }];
+  }
+}
+
+const TONES: Record<Action["tone"], string> = {
+  accept: "bg-success text-white hover:brightness-110",
+  danger: "border border-danger/40 text-danger hover:bg-danger/5",
+};
+
 export function AccountDecision({
   userId,
   status,
+  name,
 }: {
   userId: string;
   status: string;
+  name: string;
 }) {
   const [state, formAction] = useFormState(decideAccount, idleState);
+  const actions = actionsFor(status);
 
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="userId" value={userId} />
 
       <div className="flex flex-wrap gap-2">
-        {status !== "active" && (
+        {actions.map((action) => (
           <button
+            key={action.decision}
             type="submit"
             name="decision"
-            value="active"
-            className="rounded-lg bg-success px-3 py-1.5 text-xs font-medium text-white transition-[filter] hover:brightness-110"
+            value={action.decision}
+            className={[
+              "rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter,background-color]",
+              TONES[action.tone],
+            ].join(" ")}
           >
-            Approve
+            {action.label}
+            {/* The visible label is short by design; screen readers get the
+                name so the button is not just "Accept" repeated down a list. */}
+            <span className="sr-only"> {name}</span>
           </button>
-        )}
-        {status === "pending" && (
-          <button
-            type="submit"
-            name="decision"
-            value="rejected"
-            className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/5"
-          >
-            Reject
-          </button>
-        )}
-        {status === "active" && (
-          <button
-            type="submit"
-            name="decision"
-            value="suspended"
-            className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/5"
-          >
-            Suspend
-          </button>
-        )}
+        ))}
       </div>
 
       <FormMessage state={state} />

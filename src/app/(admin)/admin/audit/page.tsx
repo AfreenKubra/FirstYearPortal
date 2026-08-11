@@ -5,8 +5,8 @@ import { getAuditLog } from "@/lib/queries/admin";
 export const metadata: Metadata = { title: "Audit log" };
 
 const ACTION_LABELS: Record<string, string> = {
-  "account.active": "Account approved",
-  "account.rejected": "Account rejected",
+  "account.active": "Account accepted",
+  "account.rejected": "Account declined",
   "account.suspended": "Account suspended",
   "department.create": "Department created",
   "department.activate": "Department activated",
