@@ -132,10 +132,21 @@ export type PendingAccount = {
   status: string;
   createdAt: string;
   fullName: string | null;
-  employeeCode: string | null;
+  /** Employee code for staff, USN for students. */
+  identifier: string | null;
   departmentCode: string | null;
   designation: string | null;
 };
+
+/** Cheap count for the sidebar badge — avoids loading the whole queue. */
+export async function getPendingCount(): Promise<number> {
+  const supabase = createClient();
+  const { count } = await supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  return count ?? 0;
+}
 
 /**
  * Accounts awaiting a decision, plus recently decided ones for context.
@@ -150,21 +161,23 @@ export async function getAccountQueue(): Promise<{
 }> {
   const supabase = createClient();
 
+  // Students are included since migration 0008 — every role now needs
+  // approval, so filtering them out here would hide most of the queue.
   const { data: accounts } = await supabase
     .from("users")
     .select("id, email, role, status, created_at")
-    .neq("role", "student")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(500);
 
-  // Both staff profile tables are consulted: an administrator's details live
-  // in `admins`, a faculty member's in `faculty`. Looking in only one would
-  // leave admin requests showing as a bare email with no name attached.
-  const [facultyRows, adminRows] = await Promise.all([
+  // All three profile tables are consulted: an administrator's details live
+  // in `admins`, a faculty member's in `faculty`, a student's in `students`.
+  // Looking in only one would leave most requests showing as a bare email.
+  const [facultyRows, adminRows, studentRows] = await Promise.all([
     supabase
       .from("faculty")
       .select("user_id, full_name, employee_code, department_code, designation"),
     supabase.from("admins").select("user_id, full_name, employee_code, designation"),
+    supabase.from("students").select("user_id, full_name, usn, department_code"),
   ]);
 
   const facultyByUser = new Map(
@@ -173,10 +186,14 @@ export async function getAccountQueue(): Promise<{
   const adminsByUser = new Map(
     (adminRows.data ?? []).map((a) => [a.user_id, a]),
   );
+  const studentsByUser = new Map(
+    (studentRows.data ?? []).map((s) => [s.user_id, s]),
+  );
 
   const mapped: PendingAccount[] = (accounts ?? []).map((account) => {
     const faculty = facultyByUser.get(account.id);
     const admin = adminsByUser.get(account.id);
+    const student = studentsByUser.get(account.id);
 
     return {
       userId: account.id,
@@ -184,15 +201,22 @@ export async function getAccountQueue(): Promise<{
       role: account.role,
       status: account.status,
       createdAt: account.created_at,
-      fullName: faculty?.full_name ?? admin?.full_name ?? null,
-      employeeCode: faculty?.employee_code ?? admin?.employee_code ?? null,
-      departmentCode: faculty?.department_code ?? null,
+      fullName:
+        student?.full_name ?? faculty?.full_name ?? admin?.full_name ?? null,
+      identifier:
+        student?.usn ?? faculty?.employee_code ?? admin?.employee_code ?? null,
+      departmentCode:
+        student?.department_code ?? faculty?.department_code ?? null,
       designation: faculty?.designation ?? admin?.designation ?? null,
     };
   });
 
   return {
-    pending: mapped.filter((a) => a.status === "pending"),
+    // Oldest first: a student who registered on day one should be approved
+    // before someone who signed up an hour ago.
+    pending: mapped
+      .filter((a) => a.status === "pending")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     recent: mapped.filter((a) => a.status !== "pending").slice(0, 25),
   };
 }

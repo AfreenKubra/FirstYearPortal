@@ -25,7 +25,7 @@ type Props = {
 const STEPS = [
   { title: "Account", blurb: "How you'll sign in" },
   { title: "About you", blurb: "Identity and contact" },
-  { title: "Household", blurb: "Guardian and consent" },
+  { title: "Guardian details", blurb: "Guardian and consent" },
 ] as const;
 
 /**
@@ -239,9 +239,9 @@ export function RegisterForm({ departments, languages }: Props) {
           </div>
         </fieldset>
 
-        {/* Step 3 — household and consent */}
+        {/* Step 3 — guardian details and consent */}
         <fieldset hidden={step !== 2} className="space-y-4">
-          <legend className="sr-only">Household and consent</legend>
+          <legend className="sr-only">Guardian details and consent</legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <TextInput
               label="Parent or guardian's name"

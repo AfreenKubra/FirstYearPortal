@@ -1,15 +1,21 @@
 import { redirect } from "next/navigation";
 import { StudentNav, type NavItem } from "@/components/layout/StudentNav";
 import { LogoutButton } from "@/components/auth/LogoutButton";
-import { getOwnAdmin } from "@/lib/queries/admin";
+import { getOwnAdmin, getPendingCount } from "@/lib/queries/admin";
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/accounts", label: "Account approvals" },
-  { href: "/admin/assignments", label: "Faculty assignments" },
-  { href: "/admin/departments", label: "Departments" },
-  { href: "/admin/audit", label: "Audit log" },
-];
+function navItems(pendingCount: number): NavItem[] {
+  return [
+    { href: "/admin", label: "Overview" },
+    {
+      href: "/admin/accounts",
+      label: "Account approvals",
+      badge: pendingCount,
+    },
+    { href: "/admin/assignments", label: "Faculty assignments" },
+    { href: "/admin/departments", label: "Departments" },
+    { href: "/admin/audit", label: "Audit log" },
+  ];
+}
 
 export default async function AdminLayout({
   children,
@@ -23,9 +29,13 @@ export default async function AdminLayout({
   const admin = await getOwnAdmin();
   if (!admin) redirect("/login");
 
+  // Counted on every admin page render so the badge is never stale — it is a
+  // single indexed COUNT, and a stale approval badge is worse than useless.
+  const pendingCount = await getPendingCount();
+
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <StudentNav items={NAV_ITEMS} studentName={admin.fullName} />
+      <StudentNav items={navItems(pendingCount)} studentName={admin.fullName} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="hidden items-center justify-between border-b border-indigo-100 bg-white px-8 py-3 lg:flex">

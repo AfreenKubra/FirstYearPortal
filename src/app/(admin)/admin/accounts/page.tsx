@@ -35,7 +35,7 @@ function AccountCard({
     status: string;
     createdAt: string;
     fullName: string | null;
-    employeeCode: string | null;
+    identifier: string | null;
     departmentCode: string | null;
     designation: string | null;
   };
@@ -57,7 +57,7 @@ function AccountCard({
           {[
             account.designation,
             account.departmentCode,
-            account.employeeCode,
+            account.identifier,
             `Requested ${new Date(account.createdAt).toLocaleDateString()}`,
           ]
             .filter(Boolean)
@@ -65,8 +65,8 @@ function AccountCard({
         </p>
         {!account.fullName && (
           <p className="mt-1 text-xs text-warning">
-            No staff profile attached — this account signed up but never
-            completed its record.
+            No profile attached — this account signed up but never completed
+            its record.
           </p>
         )}
       </div>
@@ -86,10 +86,10 @@ export default async function AdminAccountsPage() {
           Account approvals
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Faculty and administrator accounts requested at{" "}
-          <span className="font-medium text-indigo-900">/register/staff</span>{" "}
-          stay inactive until approved here. Students are activated
-          automatically and never appear in this queue.
+          Every new account — student, faculty, and administrator — stays
+          inactive until approved here. Students keep whatever profile details
+          they entered while they wait, so approving one lets them straight in
+          with nothing lost.
         </p>
       </header>
 
