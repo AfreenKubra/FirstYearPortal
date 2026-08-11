@@ -8,12 +8,11 @@
 export const branding = {
   institution: {
     name: "HKBK College of Engineering",
-    shortName: "HKBK",
+    shortName: "HKBKCE",
     city: "Bengaluru",
     affiliation: "Affiliated to Visvesvaraya Technological University (VTU)",
-    // Placeholder — PRD section 9 lists the official logo file as an open
-    // question with stakeholders. Rendered as a monogram until supplied.
-    logoUrl: null as string | null,
+    // Official HKBK College of Engineering emblem logo asset
+    logoUrl: "/hkbk-logo.png" as string | null,
   },
   product: {
     name: "First-Year Portal",

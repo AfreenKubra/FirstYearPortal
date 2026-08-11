@@ -32,6 +32,8 @@ pnpm-debug.log*
 .idea/
 .claude/
 .mcp.json
+.agents/
+skills-lock.json
 
 # os
 .DS_Store

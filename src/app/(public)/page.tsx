@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
+import { HeroRoleSwitcher } from "@/components/ui/HeroRoleSwitcher";
 import { branding } from "@/config/branding";
 import { SEED_DEPARTMENTS } from "@/config/branding";
 
@@ -59,24 +60,7 @@ export default function LandingPage() {
                 analytics for faculty and a mentor-reviewed development roadmap
                 for the student.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <ButtonLink href="/register" size="lg">
-                  Create your student account
-                </ButtonLink>
-                <ButtonLink href="/login" variant="secondary" size="lg">
-                  Sign in
-                </ButtonLink>
-              </div>
-              <p className="mt-4 text-xs text-ink-faint">
-                Faculty or administrator?{" "}
-                <Link
-                  href="/register/staff"
-                  className="rounded font-medium text-indigo-700 underline hover:text-indigo-900"
-                >
-                  Request a staff account
-                </Link>{" "}
-                — approved by an administrator, never self-service.
-              </p>
+              <HeroRoleSwitcher />
             </div>
           </div>
         </section>
