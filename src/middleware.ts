@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/types";
+import { homeForRole, ROLE_PREFIXES } from "@/config/roles";
 
 /**
  * Security layer 1 of 3 (ARCHITECTURE section 3).
@@ -12,16 +13,12 @@ import type { Database } from "@/lib/supabase/types";
  * the caller server-side, and RLS backs both up.
  */
 
-const ROLE_HOME: Record<string, string> = {
-  student: "/dashboard",
-  faculty: "/faculty",
-  admin: "/admin",
-};
-
 /** Paths reachable without a session. */
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/login/hod",
+  "/login/staff",
   "/register",
   "/register/staff",
   "/forgot-password",
@@ -29,16 +26,18 @@ const PUBLIC_PATHS = [
   "/privacy",
 ];
 
-/** Which role owns which path prefix. */
-const ROLE_PREFIXES: Array<{ prefix: string; role: string }> = [
-  { prefix: "/dashboard", role: "student" },
-  { prefix: "/complete-profile", role: "student" },
-  { prefix: "/faculty", role: "faculty" },
-  { prefix: "/admin", role: "admin" },
-];
+/**
+ * Student paths that stay reachable while the mandatory profile is still
+ * incomplete. Everything else the student owns redirects to the gate.
+ */
+const PROFILE_GATE_EXEMPT = ["/complete-profile"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.includes(pathname);
+}
+
+function isLoginPath(pathname: string): boolean {
+  return pathname === "/login" || pathname.startsWith("/login/");
 }
 
 export async function middleware(request: NextRequest) {
@@ -114,10 +113,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/pending-approval", request.url));
   }
 
-  const home = ROLE_HOME[account.role] ?? "/dashboard";
+  const home = homeForRole(account.role);
 
   // A signed-in user on a login/register page belongs at their own home.
-  if (pathname === "/login" || pathname.startsWith("/register")) {
+  if (isLoginPath(pathname) || pathname.startsWith("/register")) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
@@ -128,7 +127,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- Student profile gate (PRD 5.2) --------------------------------------
-  if (account.role === "student" && pathname.startsWith("/dashboard")) {
+  // Applies to every student-owned path except the gate itself, so a student
+  // cannot skip it by deep-linking to a sibling page such as /achievements.
+  if (
+    account.role === "student" &&
+    owned?.role === "student" &&
+    !PROFILE_GATE_EXEMPT.some((exempt) => pathname.startsWith(exempt))
+  ) {
     const { data: student } = await supabase
       .from("students")
       .select("profile_completion_percent")

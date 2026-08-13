@@ -85,32 +85,48 @@ Three independent layers, each capable of blocking access on its own:
    middleware or server-action check is ever missed. Every table with
    student data has RLS enabled; policies key off `auth.uid()` compared
    against `students.user_id`, with a `current_user_role()` helper function
-   for admin-wide read policies. **Shipped for all MVP tables.** Faculty
-   read policies are deliberately **not yet added** — they depend on
-   `faculty_student_assignments`, which doesn't exist yet, and adding a
-   broad "faculty reads all students" policy ahead of that would be a
-   security regression, not a shortcut.
+   for admin-wide read policies. **Shipped for all tables.** All staff
+   visibility resolves through the single `can_faculty_view_student()`
+   function (migration 0003, widened in 0011) that section 11 asked for —
+   which is why adding the HOD role meant editing one function body rather
+   than a dozen policies across three migrations.
 
 No layer is trusted alone. When new routes/mutations are added, all three
 layers need updating together.
 
 ## 4. Role/permission model
 
-| | Student | Faculty | Admin |
-|---|---|---|---|
-| Own profile: read/write | ✅ | – | – |
-| Other students: read | ❌ | ✅, scoped to assignment (planned) | ✅, all |
-| Verify achievements | ❌ | ✅, assigned students (planned) | ✅ |
-| Create/assign assessments | ❌ | ✅ (planned) | ✅ (planned) |
-| Guardian contact fields | ✅ own record only | ⚠️ masked unless assigned mentor (planned) | ✅ |
-| Manage departments/resources | ❌ | ❌ | ✅ (planned) |
-| Approve faculty/admin accounts | ❌ | ❌ | ✅ (planned) |
-| View audit log | ❌ | ❌ | ✅ (planned) |
+| | Student | Faculty | HOD | Admin |
+|---|---|---|---|---|
+| Own profile: read/write | ✅ | – | – | – |
+| Other students: read | ❌ | ✅, scoped to assignment | ✅, own department | ✅, all |
+| Verify achievements | ❌ | ✅, assigned students | ✅, own department | ✅ |
+| Create/assign assessments | ❌ | ✅ (planned) | ✅ (planned) | ✅ (planned) |
+| Guardian contact fields | ✅ own record only | ⚠️ masked unless assigned mentor | ✅, own department | ✅ |
+| Manage departments/resources | ❌ | ❌ | ❌ | ✅ |
+| Approve accounts, change roles | ❌ | ❌ | ❌ | ✅ |
+| View audit log | ❌ | ❌ | ❌ | ✅ |
 
 `role` and `status` live on the `users` shadow table (1:1 with
 `auth.users`), never on the JWT alone, so a role change takes effect
 immediately without waiting for token refresh — every check re-reads the
 table.
+
+**Head of Department** is a role, not a job title. A HOD's profile lives in
+the same `faculty` table as a mentor's — they are teaching staff with a
+department — and what separates them is `users.role = 'hod'`, which is what
+`current_hod_department()` keys off. One staff table rather than a
+near-duplicate `hods` is what lets every existing faculty-scoped policy pick
+HODs up without being rewritten.
+
+**Administrator is allow-list-only** (migration 0011). It is the one role with
+institution-wide reach, and `handle_new_auth_user` takes the requested role
+from signup metadata — so before the allow-list, a stranger could register
+asking for `role: 'admin'` and appear in the approvals queue as a legitimate
+request. A `before insert or update` trigger on `public.users` now refuses any
+write setting `role = 'admin'` for an address absent from
+`public.admin_allowlist`, and that table has no INSERT policy, so it cannot be
+widened from inside the application at all.
 
 ## 5. Data model
 
@@ -221,10 +237,11 @@ psychometric data — an explicit masking policy, not just an access policy.
 ```
 src/
   app/
-    (public)/        landing, register, login, forgot/reset-password, privacy
-    (student)/        layout.tsx (sidebar shell) + dashboard, complete-profile
-    (faculty)/        planned — mirrors (student) with faculty nav
-    (admin)/          planned
+    (public)/        landing, register, login, /login/hod, forgot/reset-password, privacy
+    (student)/        layout.tsx (sidebar shell) + dashboard, complete-profile, achievements
+    (faculty)/        dashboard, student directory, detail, export, verification queue
+    (hod)/            the same shape, scoped to one department
+    (admin)/          overview, students, approvals, roles, assignments, departments, audit
   components/
     ui/               Button, Field (TextInput/Select), Card/ProgressBar — design-token driven
     registration/      RegisterForm (multi-step)
@@ -239,10 +256,25 @@ src/
   config/branding.ts     institution config (name, logo, departments, contacts)
 ```
 
-Route groups `(public)` / `(student)` / `(faculty)` / `(admin)` don't
-affect the URL — `/dashboard` is `/dashboard` regardless of which group
+Route groups `(public)` / `(student)` / `(faculty)` / `(hod)` / `(admin)`
+don't affect the URL — `/dashboard` is `/dashboard` regardless of which group
 folder it lives in — they exist purely to attach a shared `layout.tsx` per
 role, which is where the sidebar/nav differs.
+
+**The three staff directories are one implementation.** `components/directory/`
+holds the filters, table, charts, profile view, dashboard, and verification
+queue; `lib/queries/directory.ts` holds the reads. None of it takes a role, a
+faculty id, or a department — scoping comes entirely from RLS, so the same
+`listStudents(filters)` call returns a mentor's assignments, a HOD's
+department, or the whole institution depending only on who is asking. The
+pages differ in their copy and their `basePath`.
+
+A note on the role shells: each layout re-checks its own role independently of
+middleware and, when the profile row is missing, redirects to
+`/account-blocked` rather than `/login`. Sending them to `/login` produced a
+redirect loop — middleware bounces an authenticated staff session straight
+back to the role home, which redirects to `/login` again — that a user
+experienced as a dead browser tab.
 
 ## 8. Design system
 
@@ -260,6 +292,8 @@ is built around.
 |---|---|---|
 | Unit — validation schemas | Shipped | `src/lib/validation/__tests__` |
 | Unit — completion-percent logic | Shipped | `src/lib/__tests__` |
+| Unit — role table, allow-list, route coverage | Shipped | `src/config/__tests__` |
+| Schema drift — which migrations the live DB is missing | Shipped | `scripts/check-schema.mjs` |
 | Integration — auth/API | Planned | — |
 | RLS policy tests | Planned | — |
 | E2E — critical workflows (PRD-referenced 12 scenarios) | Planned | — |
@@ -281,11 +315,21 @@ currently pass against the shipped slice; none are wired into CI yet.
 
 ## 11. Key risks / decisions to revisit
 
-- **RLS policy growth:** as `faculty_student_assignments` and per-table
-  faculty policies are added, policy logic will get more complex
-  (department + semester + section + explicit mentoring group). Consider a
-  single `can_faculty_view_student(student_id)` SQL function reused across
-  every policy, rather than duplicating the join logic per table.
+- **RLS policy growth — resolved, and it paid off.** The single
+  `can_faculty_view_student(student_id)` function this section originally
+  proposed is now the only place staff visibility is decided, and every
+  faculty-scoped policy across migrations 0003 and 0009 calls it. Adding the
+  Head of Department role in 0011 therefore meant adding one branch to one
+  function; no policy changed. The cost to watch is the opposite one: the
+  function is now on the hot path of every student-facing query, so if the
+  branches keep multiplying it becomes the thing to profile first.
+- **`can_faculty_view_student`'s HOD branch ignores `p_mentor_only`,** which
+  is what drives guardian masking, so a head of department sees guardian
+  contact for their whole department. That is deliberate — they are who has to
+  ring a guardian when a student stops attending — but it is a genuine
+  widening of the PRD's original "assigned mentor only" rule, and it should be
+  revisited if departments grow large enough that "head of department" stops
+  meaning one accountable person.
 - **Hand-written Supabase types:** `src/lib/supabase/types.ts` must be
   regenerated from the real schema once it stabilizes; the current
   hand-written version is a deliberate stopgap and already required one

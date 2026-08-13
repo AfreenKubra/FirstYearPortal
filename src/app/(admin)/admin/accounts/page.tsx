@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { AccountDecision } from "@/components/admin/AccountDecision";
+import { RoleControl } from "@/components/admin/RoleControl";
 import { getAccountQueue } from "@/lib/queries/admin";
+import { roleLabel } from "@/config/roles";
 
 export const metadata: Metadata = { title: "Account approvals" };
 
@@ -57,8 +59,8 @@ function AccountCard({
             {account.fullName ?? account.email}
           </p>
           <StatusPill status={account.status} />
-          <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs font-medium capitalize text-indigo-800">
-            {account.role}
+          <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800">
+            {roleLabel(account.role)}
           </span>
         </div>
         <p className="mt-1 break-all text-sm text-ink-muted">{account.email}</p>
@@ -80,12 +82,21 @@ function AccountCard({
         )}
       </div>
 
-      <AccountDecision
-        userId={account.userId}
-        status={account.status}
-        name={account.fullName ?? account.email}
-        isSelf={account.isSelf}
-      />
+      <div className="flex shrink-0 flex-wrap items-start gap-4">
+        <RoleControl
+          userId={account.userId}
+          email={account.email}
+          role={account.role}
+          name={account.fullName ?? account.email}
+          isSelf={account.isSelf}
+        />
+        <AccountDecision
+          userId={account.userId}
+          status={account.status}
+          name={account.fullName ?? account.email}
+          isSelf={account.isSelf}
+        />
+      </div>
     </li>
   );
 }
@@ -100,10 +111,12 @@ export default async function AdminAccountsPage() {
           Account approvals
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Every new account — student, faculty, and administrator — stays
-          inactive until approved here. Students keep whatever profile details
-          they entered while they wait, so approving one lets them straight in
-          with nothing lost.
+          Every new account stays inactive until approved here. Students keep
+          whatever profile details they entered while they wait, so approving
+          one lets them straight in with nothing lost. Promoting an approved
+          faculty account to Head of Department gives them their whole
+          department; the Administrator role is limited to allow-listed
+          addresses and cannot be granted from this screen.
         </p>
       </header>
 

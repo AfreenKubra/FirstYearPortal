@@ -21,6 +21,10 @@ import {
   evaluateSections,
 } from "@/lib/profile-completion";
 import { RESIDENCE_FIELD_LABEL, residenceLabel } from "@/config/residence";
+import {
+  getOwnAchievements,
+  summariseAchievements,
+} from "@/lib/queries/achievements";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -43,7 +47,7 @@ export default async function DashboardPage() {
   if (!student) redirect("/login");
 
   const supabase = createClient();
-  const [snapshot, lookups, academicRow] = await Promise.all([
+  const [snapshot, lookups, academicRow, achievements] = await Promise.all([
     getProfileSnapshot(student),
     getLookups(),
     supabase
@@ -51,7 +55,10 @@ export default async function DashboardPage() {
       .select("*")
       .eq("student_id", student.id)
       .maybeSingle(),
+    getOwnAchievements(student.id),
   ]);
+
+  const achievementSummary = summariseAchievements(achievements);
 
   const percent = computeCompletionPercent(snapshot);
   const sections = evaluateSections(snapshot);
@@ -161,6 +168,41 @@ export default async function DashboardPage() {
                   <p className="text-sm text-ink-faint">Not set yet.</p>
                 )}
               </div>
+            </CardBody>
+          </Card>
+
+          <Card as="section">
+            <CardHeader
+              title="Achievements"
+              description="Sports, certifications, competitions — anything you have earned."
+              action={
+                <ButtonLink href="/achievements" variant="secondary" size="sm">
+                  {achievementSummary.total > 0 ? "Manage" : "Add one"}
+                </ButtonLink>
+              }
+            />
+            <CardBody>
+              {achievementSummary.total === 0 ? (
+                <EmptyState
+                  title="Nothing recorded yet"
+                  description="Add your certificates and competition results so your mentor can verify them."
+                />
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <StatTile
+                    label="Verified"
+                    value={String(achievementSummary.verified)}
+                  />
+                  <StatTile
+                    label="Awaiting review"
+                    value={String(achievementSummary.pending)}
+                  />
+                  <StatTile
+                    label="Not verified"
+                    value={String(achievementSummary.rejected)}
+                  />
+                </div>
+              )}
             </CardBody>
           </Card>
 

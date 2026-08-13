@@ -12,7 +12,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "node scripts/migrate.mjs",
-    "migrate:dry": "node scripts/migrate.mjs --dry"
+    "migrate:dry": "node scripts/migrate.mjs --dry",
+    "check:schema": "node scripts/check-schema.mjs",
+    "sync:admins": "node scripts/sync-admins.mjs",
+    "seed:students": "node scripts/seed-students.mjs",
+    "seed:students:dry": "node scripts/seed-students.mjs --dry"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
