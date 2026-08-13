@@ -1,0 +1,187 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/reference/configuration
+#
+# This portal holds real first-year student records: names, registration
+# numbers, marks, home addresses, and guardian phone numbers. The review rules
+# below are weighted towards the things that would actually hurt if they went
+# wrong — a missing RLS policy, a server action that trusts a client-supplied
+# id, a redirect loop that locks someone out — rather than style.
+#
+# The path_instructions are the useful part. They tell the reviewer this
+# codebase's invariants, which are not guessable from a diff: that faculty
+# scoping lives in one SQL function, that guardian masking is done by a view
+# and not by the application, that every mutation re-derives its caller.
+
+language: "en-US"
+
+tone_instructions: >
+  Be direct and specific. Prioritise security and correctness over style.
+  When flagging something, say what breaks and under what input, not just
+  that it is a smell.
+
+early_access: false
+
+reviews:
+  # Assertive rather than chill: this repo enforces access boundaries for
+  # student personal data, so a quieter profile that skips borderline
+  # findings is the wrong trade here.
+  profile: "assertive"
+
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: true
+  sequence_diagrams: true
+  poem: false
+
+  # Not enabled: a bot holding a PR open with "changes requested" blocks a
+  # solo maintainer with nobody to dismiss it.
+  request_changes_workflow: false
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  path_filters:
+    - "!package-lock.json"
+    - "!**/*.tsbuildinfo"
+    - "!.next/**"
+    - "!public/**"
+
+  path_instructions:
+    - path: "supabase/migrations/**/*.sql"
+      instructions: >
+        Row Level Security is the last line of defence and the only one that
+        holds if middleware and the server actions are both wrong.
+
+        Check that: every new table holding student data has RLS enabled and
+        at least one policy (RLS enabled with no policy denies everyone, which
+        is safe but usually unintended, and no RLS at all is a silent leak);
+        every faculty- or HOD-scoped policy calls can_faculty_view_student()
+        rather than re-deriving the join, since that function is deliberately
+        the single place visibility is decided; SECURITY DEFINER functions set
+        an explicit search_path; and views over student data are created
+        `with (security_invoker = true)` — without it a view runs as its owner
+        and bypasses every row policy underneath it.
+
+        Guardian contact is masked at the column level by the
+        student_directory view, because RLS controls rows and cannot mask a
+        column. A change that reads guardian_name or guardian_phone from
+        public.students directly rather than through that view is a leak, even
+        if the row policy looks correct.
+
+        audit_logs deliberately has no INSERT policy: entries are written with
+        the service role so a session cannot forge or suppress a record of its
+        own actions. Adding an INSERT policy there is a regression, not a fix.
+
+        Migrations are immutable once applied. Editing an existing numbered
+        file means environments silently disagree — a change belongs in a new
+        file. Flag any edit to a previously shipped migration.
+
+        `ALTER TYPE ... ADD VALUE` must be alone in its own migration file:
+        PostgreSQL will not let one transaction add an enum value and then use
+        it, and both the SQL Editor and the runner wrap each file in a
+        transaction.
+
+    - path: "src/lib/actions/**/*.ts"
+      instructions: >
+        Server Actions are security layer 2 of 3. Every mutation must
+        re-derive the caller's identity from their session via
+        auth.getUser(), then look up that caller's own row — never trust an
+        id, student_id, or role posted in the FormData. A client may post any
+        id it likes and must still only be able to write its own row.
+
+        Check that privileged writes are followed by an audit entry, and that
+        the audit write cannot take down the operation it records.
+
+        Administrator is allow-list-only. Any code path that can set
+        users.role = 'admin' must check the allow-list; the database trigger
+        is the real enforcement, but a missing check here surfaces as a raw
+        Postgres exception to the user instead of a sentence.
+
+        Actions that redirect must not redirect to a route the middleware will
+        bounce straight back.
+
+    - path: "src/middleware.ts"
+      instructions: >
+        Security layer 1 of 3, and the one most easily broken by a small edit.
+
+        role and status must be read from the users table on every request,
+        never from JWT claims — that is what makes a suspension take effect on
+        the next request rather than at token refresh.
+
+        The response object carrying Supabase's refreshed auth cookies must be
+        returned on every branch. Returning a fresh NextResponse after the
+        session read silently drops the rotated token and logs the user out on
+        their next request; this has bitten this file before.
+
+        Any new role or route prefix needs a matching entry in
+        src/config/roles.ts. A role whose home route is not covered by a
+        prefix rule, or is covered by another role's rule, is a redirect loop.
+
+    - path: "src/lib/queries/**/*.ts"
+      instructions: >
+        Reads are scoped by RLS, not by a parameter. lib/queries/directory.ts
+        in particular takes no role, faculty id, or department on purpose:
+        the same call returns a mentor's assignments, a head of department's
+        department, or the whole institution depending only on who is asking.
+
+        Flag any change that adds a caller-supplied scope argument to these
+        functions — it moves an access decision out of the database and into
+        code that a future caller can get wrong.
+
+        These functions must fail closed. Returning all rows, or falling back
+        to an unfiltered query, when a scope lookup returns empty is a leak;
+        an empty result is the correct answer.
+
+    - path: "src/components/**/*.tsx"
+      instructions: >
+        Accessibility is a stated product requirement, not a nice-to-have.
+        Every form control needs a real label, every chart needs a tabular
+        alternative (the existing charts are built as tables with the bars
+        drawn inside, so the two cannot drift apart), and colour must never be
+        the only carrier of meaning.
+
+        Client components must not receive guardian contact, service-role
+        data, or anything else the server would not render for that caller.
+
+        Filtering and navigation should keep working without client
+        JavaScript where it reasonably can — the directory filters are a real
+        GET form for exactly this reason.
+
+    - path: "src/lib/validation/**/*.ts"
+      instructions: >
+        These Zod schemas run in the browser for feedback and again inside the
+        server action before anything is written. The server run is the one
+        that counts, so flag any validation that exists only client-side.
+
+        Watch coercion order: z.coerce.number() turns "" into 0, so an empty
+        optional numeric field must be preprocessed to null before coercion,
+        or a blank input silently records a real zero.
+
+    - path: "scripts/**/*.mjs"
+      instructions: >
+        These run with the service-role key, which bypasses RLS entirely.
+        Confirm the key is only ever read from the environment, never
+        hardcoded or logged, and that nothing here is importable by client
+        code.
+
+        Bulk operations should be idempotent and safe to re-run, and should
+        clean up after a partial failure rather than leaving orphaned auth
+        identities behind.
+
+    - path: "**/*.test.ts"
+      instructions: >
+        Check that assertions pin the real invariant rather than restating the
+        implementation, and that the failure modes actually worth catching —
+        empty input, boundary values, absent optional fields — are covered.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: "local"
+  code_guidelines:
+    enabled: true
