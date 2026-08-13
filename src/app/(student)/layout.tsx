@@ -11,7 +11,7 @@ import { getOwnStudent } from "@/lib/queries/student";
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/complete-profile", label: "My profile" },
-  { href: "#", label: "Achievements", disabled: true },
+  { href: "/achievements", label: "Achievements" },
   { href: "#", label: "Assessments", disabled: true },
   { href: "#", label: "Events", disabled: true },
   { href: "#", label: "Resources", disabled: true },

@@ -26,15 +26,26 @@ export default function LoginPage({
       title="Sign in"
       subtitle="Use the email address and password you registered with."
       footer={
-        <p>
-          New here?{" "}
-          <Link
-            href="/register"
-            className="rounded font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
-          >
-            Create a student account
-          </Link>
-        </p>
+        <div className="space-y-1">
+          <p>
+            New here?{" "}
+            <Link
+              href="/register"
+              className="rounded font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
+            >
+              Create a student account
+            </Link>
+          </p>
+          <p>
+            Head of department?{" "}
+            <Link
+              href="/login/hod"
+              className="rounded font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
+            >
+              Use the HOD entrance
+            </Link>
+          </p>
+        </div>
       }
     >
       {error && (

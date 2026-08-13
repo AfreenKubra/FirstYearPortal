@@ -11,7 +11,7 @@ independent layers.
 ![Next.js](https://img.shields.io/badge/Next.js-14-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e)
-![Tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)
 
 ---
 
@@ -25,8 +25,10 @@ could not report on outcomes without manual collation.
 This portal collects a complete structured profile from every student once,
 then makes that data queryable — under strict role boundaries. A student can
 never see another student's record. A faculty member sees only the students
-assigned to them. Guardian contact details are visible only to a student's
-assigned mentor.
+assigned to them; a head of department sees their department; an administrator
+sees the institution. Guardian contact details reach only the people who
+actually need them: a student's assigned mentor, their head of department, and
+administrators.
 
 ## Features
 
@@ -46,20 +48,43 @@ assigned mentor.
   distributions by department, semester, quota, and residence type
 - Student directory with eleven combinable filters, search, and pagination
 - Filter state lives in the URL, so any view is linkable and shareable
+- Charts summarising the whole filtered set, not just the visible page
 - Full authorised profile for any assigned student
 - CSV export carrying a provenance header — who exported, when, and which
   filters produced the file
 - Students flagged for follow-up, least-complete profile first
+- Achievement verification queue
+
+### Head of Department
+
+- A separate sign-in entrance at `/login/hod` that accepts only HOD accounts
+- Every student in their department, with no assignment rows needed — the
+  scope comes from `can_faculty_view_student()`, the same function every other
+  faculty policy already used
+- The same directory, filters, charts, CSV export, and profile view faculty
+  get, over the department rather than an assignment list
+- Guardian contact for their department, because a head of department is who
+  actually has to ring a guardian
+- Achievement verification for the whole department
 
 ### Administrator
 
 - Institution-wide analytics and a side-by-side department comparison
-- Account approval queue for faculty and administrator requests
+- The full student directory with the same filters, charts, and CSV export
+- Account approval queue for every role
+- Role management — promote an approved faculty account to Head of Department
 - Faculty assignment management — by department/semester/section scope or by
   named student, with a separate mentor flag
 - Department management, without a deploy
 - Append-only audit log of every privileged action
 - Institution CSV report
+
+The `admin` role is restricted to an allow-list held in the database
+(`public.admin_allowlist`). It is the one role with institution-wide reach,
+and until migration 0011 anything could reach it — `handle_new_auth_user`
+takes the role straight from signup metadata, so a stranger could register
+asking for `role: 'admin'` and sit in the approvals queue looking like a
+legitimate request. A trigger now refuses the write outright.
 
 ## Security model
 
@@ -68,12 +93,23 @@ trusted alone.
 
 | Layer | Where | Enforces |
 |---|---|---|
-| **1. Middleware** | [`src/middleware.ts`](src/middleware.ts) | Session exists; `role`/`status` read live from the database, not the JWT, so a suspension takes effect on the next request; cross-role access redirected; incomplete student profiles sent back to the gate |
+| **1. Middleware** | [`src/middleware.ts`](src/middleware.ts) | Session exists; `role`/`status` read live from the database, not the JWT, so a suspension takes effect on the next request; cross-role access redirected; incomplete student profiles sent back to the gate, on every student route rather than only `/dashboard` |
 | **2. Server Actions** | [`src/lib/actions/`](src/lib/actions/) | Every mutation re-derives the caller's identity from their session. A client may post any id it likes and still writes only its own row |
-| **3. Postgres RLS** | [`supabase/migrations/`](supabase/migrations/) | Policies key off `auth.uid()`. Faculty visibility resolves through a single `can_faculty_view_student()` function reused by every policy |
+| **3. Postgres RLS** | [`supabase/migrations/`](supabase/migrations/) | Policies key off `auth.uid()`. All staff visibility — mentor, head of department — resolves through a single `can_faculty_view_student()` function reused by every policy, so adding the HOD role widened one function rather than touching a dozen policies |
 
 Additional measures:
 
+- **The `admin` role is allow-list-only.** A trigger on `public.users` refuses
+  any write that sets `role = 'admin'` for an address not in
+  `public.admin_allowlist`, which has no INSERT policy — so no signed-in
+  session, administrator or otherwise, can widen it from inside the
+  application. This closes the path where signup metadata (`role: 'admin'`)
+  decided the requested role.
+- **Role-specific sign-in entrances are enforced server-side.** `/login/hod`
+  posts the role it serves as a hidden field; the login action reads the real
+  role back from `users` and compares it there. A mismatch ends the session
+  rather than redirecting, so a refused visitor is not left holding valid
+  credentials.
 - **Column-level guardian masking.** RLS controls which *rows* are visible but
   cannot mask a column. A `security_invoker` view resolves guardian contact to
   `NULL` unless the caller is the assigned mentor or an administrator — so the
@@ -129,6 +165,14 @@ In the Supabase dashboard, open **SQL Editor** and run each file in
 | `0006_email_sync.sql` | Keeps `users.email` in step with Supabase Auth |
 | `0007_residence_type.sql` | Replaces the two-value accommodation field with four residence types |
 | `0008_approve_all_registrations.sql` | Every new account starts `pending`, students included |
+| `0009_achievements.sql` | Achievements, evidence documents, verification guards, private storage bucket |
+| `0010_hod_role_enum.sql` | Adds `hod` to the `user_role` enum — **on its own, nothing else** |
+| `0011_hod_scope_and_admin_allowlist.sql` | HOD department scope, administrator allow-list and its guard trigger |
+
+**0010 and 0011 must be run as two separate statements.** PostgreSQL will not
+let one transaction add an enum value and then use it, and both the SQL Editor
+and the migration runner wrap each file in a transaction. Running them
+together fails with `unsafe use of new value of enum type`.
 
 Once `DATABASE_URL` is configured (below), later migrations can instead be
 applied with:
@@ -137,6 +181,20 @@ applied with:
 npm run migrate        # apply anything pending
 npm run migrate:dry    # list what would run, change nothing
 ```
+
+To find out what the live database is actually missing:
+
+```bash
+npm run check:schema
+```
+
+This probes for the objects each migration creates rather than reading
+`schema_migrations`, so it gives a true answer even when migrations were
+pasted into the SQL Editor by hand. It exists because the app is written to
+degrade quietly when a migration is missing — queries return empty results
+rather than throwing — which is right in production and unhelpful during
+setup, where "the achievements page is empty" and "the achievements table does
+not exist" look identical from the browser.
 
 ### 3. Disable email confirmation
 
@@ -169,23 +227,78 @@ npm run dev
 
 Open <http://localhost:3000>.
 
-### 6. Create the first administrator
+### 6. Administrators
 
-Administrator accounts are never self-service, which leaves the first one to
-be created by hand, once.
+Administrator accounts are not self-service and cannot be requested through
+the portal. Migration 0011 seeds `public.admin_allowlist` with the approved
+addresses and promotes any matching account that already exists, so after
+running it the listed administrators can simply sign in.
 
-1. Register at `/register/staff` and select **Administrator**.
-2. Activate that account:
+To approve a different address, add it to the allow-list **and** to
+`ADMIN_ALLOWLIST` in [`src/config/roles.ts`](src/config/roles.ts). The table
+has no INSERT policy, so this is a service-role operation — run it in the SQL
+Editor, not from the application:
 
 ```sql
-update public.users
-   set status = 'active'
- where email = 'your-admin@example.com'
-   and role = 'admin';
+insert into public.admin_allowlist (email, note)
+values ('new-admin@hkbk.edu.in', 'Why this person')
+on conflict (email) do nothing;
 ```
 
-Every administrator after the first is approved inside the portal, under
-**Account approvals**.
+Then set their role under **Account approvals**. The database trigger refuses
+the role change until the address is on the list, so the two cannot drift out
+of step silently.
+
+`npm run sync:admins` does the same reconciliation from the command line —
+promoting every allow-listed account that exists, and suspending any
+administrator who is not on the list. It is data-only and idempotent, so it
+works before migration 0011 has been applied and is safe to re-run:
+
+```bash
+npm run sync:admins -- --dry     # show what would change
+npm run sync:admins
+```
+
+### 7. Create a Head of Department
+
+1. Register at `/register/staff`, choose **Head of Department**, and pick the
+   department.
+2. An administrator accepts the account under **Account approvals**.
+3. On the same screen, set the account's role to **Head of Department**.
+
+They then sign in at `/login/hod` and see their whole department — no
+assignment rows required.
+
+### 8. Bulk-create student accounts
+
+```bash
+npm run seed:students:dry                        # show what would be created
+npm run seed:students                            # 1HK24AI001–015, AIML
+npm run seed:students -- --from 1 --to 60
+npm run seed:students -- --dept CSE --prefix 1HK24CS
+npm run seed:students -- --passwordSuffix '@hkbk2026'
+npm run seed:students -- --reset-passwords       # re-apply to existing accounts
+```
+
+Each student gets their own USN as their password: `1HK24AI001` signs in as
+`1hk24ai001@hkbk.edu.in` with `1hk24ai001@hkbk`. Per-student rather than one
+shared secret — a single cohort-wide password is one leak away from every
+account, and it cannot be rotated for one student without rotating it for all
+of them.
+
+Creating a student means creating an auth identity, which SQL cannot do —
+`auth.users` rows carry hashed credentials only Supabase Auth may write — so
+this runs against the Admin API with the service-role key. Accounts are
+created pre-confirmed and active, since an account an administrator just made
+by hand does not also need that administrator to approve it. Re-running is
+safe: an existing USN or email is reported and skipped, unless
+`--reset-passwords` is passed, which is the one flag that deliberately
+changes an existing account.
+
+These are handout credentials, not secrets. The password is derivable from the
+USN, so anyone who knows a student's registration number knows their password
+until they change it — tell students to change it on first sign-in. Each still
+has to complete their own profile before the dashboard unlocks.
 
 ## Scripts
 
@@ -198,36 +311,50 @@ Every administrator after the first is approved inside the portal, under
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit tests |
 | `npm run migrate` | Apply pending database migrations |
+| `npm run check:schema` | Report which migrations the live database is missing |
+| `npm run sync:admins` | Reconcile who holds the `admin` role against the allow-list |
+| `npm run seed:students` | Bulk-create student accounts |
 
 ## Project structure
 
 ```
 src/
   app/
-    (public)/          landing, login, register, staff register, password reset, privacy
-    (student)/         dashboard, complete-profile
-    (faculty)/         dashboard, student directory, student detail, CSV export
-    (admin)/           overview, approvals, assignments, departments, audit, export
+    (public)/          landing, login, HOD login, register, staff register, reset, privacy
+    (student)/         dashboard, complete-profile, achievements
+    (faculty)/         dashboard, student directory, detail, export, verification queue
+    (hod)/             the same, scoped to one department
+    (admin)/           overview, students, approvals, assignments, departments, audit, export
     auth/callback/     Supabase email-link exchange
   components/
     ui/                Button, Field, Card, ProgressBar, Logo, FormStatus
     layout/            AuthShell, role navigation
     registration/      student and staff registration forms
-    faculty/           filters, distribution charts
-    admin/             approval, department, and assignment forms
+    directory/         filters, table, charts, profile, dashboards — shared by all three staff roles
+    achievements/      achievement card, form, verification form
+    admin/             approval, role, department, and assignment forms
   lib/
     supabase/          browser, server, and service-role clients; hand-written types
     validation/        Zod schemas shared client and server
     actions/           Server Actions (all mutations)
-    queries/           read paths for student, faculty, and admin
+    queries/           directory (shared), student, faculty, admin, achievements
+    directory/         CSV export builder
     faculty/           filter parsing and CSV helpers
     admin/             analytics aggregation
     profile-completion.ts   pure, unit-tested completion logic
-  config/              branding, departments, residence types, states
+  config/              branding, roles, departments, residence types, achievements, states
   middleware.ts        session, role, status, and profile gate
 supabase/migrations/   ordered SQL migrations
-scripts/migrate.mjs    migration runner
+scripts/               migration runner, schema doctor, student seeder
 ```
+
+The faculty, HOD, and admin directories are one implementation. Nothing in
+`lib/queries/directory.ts` takes a role, a faculty id, or a department:
+scoping comes entirely from RLS on `student_directory`, which resolves through
+`can_faculty_view_student()`. A mentor sees their assignments, a head of
+department sees their department, an administrator sees the institution — and
+a bug in the filters can return the wrong subset but cannot return a student
+the caller is not entitled to.
 
 ## Testing
 
@@ -235,7 +362,7 @@ scripts/migrate.mjs    migration runner
 npm test
 ```
 
-89 unit tests covering profile-completion gate logic, every validation schema,
+129 unit tests covering profile-completion gate logic, every validation schema,
 directory filter parsing, CSV escaping, and analytics aggregation.
 
 Integration, RLS-policy, and end-to-end tests are planned.
@@ -260,8 +387,10 @@ is real rather than demo.
 | Student registration and mandatory profile | Complete |
 | Student dashboard | Complete |
 | Faculty dashboard, directory, filters, export | Complete |
-| Admin analytics, approvals, assignments, departments, audit | Complete |
-| Achievements | Not started |
+| HOD portal, department scope, directory, export | Complete |
+| Admin analytics, student directory, approvals, roles, assignments, departments, audit | Complete |
+| Achievements | Complete |
+| Charts over a filtered result set | Complete |
 | Assessment engine | Not started |
 | Events | Not started |
 | VTU resources and certification recommendations | Not started |

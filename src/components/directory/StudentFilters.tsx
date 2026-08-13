@@ -1,26 +1,36 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Select, TextInput } from "@/components/ui/Field";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import type { LookupOption } from "@/lib/queries/student";
 import { RESIDENCE_FIELD_LABEL, RESIDENCE_TYPES } from "@/config/residence";
 
 /**
- * Combinable filters (PRD 5.5).
+ * Combinable filters (PRD 5.5), shared by the faculty, HOD, and admin
+ * directories — only `basePath` differs.
  *
  * State lives in the URL, not in component state: that makes any filtered
- * view linkable and shareable between faculty, survives a refresh, and means
- * the CSV export can be handed the exact same query string rather than
+ * view linkable and shareable, survives a refresh, and lets the CSV export
+ * and the charts be handed the exact same query string rather than
  * reimplementing the filter set.
+ *
+ * The element is a real `method="get"` form pointed at `basePath`, so
+ * submitting it filters correctly even with no client JavaScript running at
+ * all. `onSubmit` then improves on that: it drops the empty fields a native
+ * submission would send, resets the page number, and navigates client-side.
+ * Filtering must not be one of the things that quietly stops working when a
+ * script fails to load.
  */
 export function StudentFiltersPanel({
+  basePath,
   departments,
   interests,
   goals,
   domains,
 }: {
+  basePath: string;
   departments: Array<{ code: string; name: string }>;
   interests: LookupOption[];
   goals: LookupOption[];
@@ -28,28 +38,35 @@ export function StudentFiltersPanel({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => hasAdvancedFilter(searchParams));
 
   const current = (key: string) => searchParams.get(key) ?? "";
 
-  function apply(formData: FormData) {
+  function apply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const params = new URLSearchParams();
+
     // Array.from rather than iterating the FormData directly: TypeScript 5.6+
     // types `entries()` as an IteratorObject, which needs downlevelIteration
     // to spread. This is equivalent and avoids the compiler flag.
-    for (const [key, value] of Array.from(formData.entries())) {
+    for (const [key, value] of Array.from(new FormData(event.currentTarget).entries())) {
       const text = String(value).trim();
       if (text) params.set(key, text);
     }
+
     // Any filter change resets to page 1 — staying on page 7 of a result set
     // that now has two pages shows an empty table for no obvious reason.
     params.delete("page");
-    router.push(`/faculty/students?${params.toString()}`);
+
+    const query = params.toString();
+    router.push(query ? `${basePath}?${query}` : basePath);
   }
 
   return (
     <form
-      action={apply}
+      method="get"
+      action={basePath}
+      onSubmit={apply}
       className="rounded-card border border-indigo-100 bg-white shadow-card"
     >
       <div className="flex flex-wrap items-end gap-3 p-4">
@@ -71,13 +88,11 @@ export function StudentFiltersPanel({
         >
           {open ? "Fewer filters" : "More filters"}
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.push("/faculty/students")}
-        >
+        {/* A link, not a button: resetting is a navigation, and this way it
+            still works with scripting unavailable. */}
+        <ButtonLink href={basePath} variant="ghost">
           Reset
-        </Button>
+        </ButtonLink>
       </div>
 
       <div
@@ -186,4 +201,27 @@ export function StudentFiltersPanel({
       </div>
     </form>
   );
+}
+
+const ADVANCED_KEYS = [
+  "department",
+  "semester",
+  "section",
+  "quota",
+  "residence",
+  "completion",
+  "interest",
+  "goal",
+  "domain",
+  "minTenth",
+  "minTwelfth",
+];
+
+/**
+ * Opens the advanced panel on load when one of its fields is already active.
+ * Landing on a shared link with four filters applied and a collapsed panel
+ * that says "More filters" reads as though nothing is filtered.
+ */
+function hasAdvancedFilter(params: URLSearchParams): boolean {
+  return ADVANCED_KEYS.some((key) => (params.get(key) ?? "") !== "");
 }

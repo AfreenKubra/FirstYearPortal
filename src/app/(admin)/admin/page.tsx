@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardBody, CardHeader, ProgressBar, StatTile } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
-import { DistributionBars } from "@/components/faculty/DistributionBars";
+import { DistributionChart } from "@/components/directory/DistributionChart";
 import { getAdminOverview } from "@/lib/queries/admin";
 
 export const metadata: Metadata = { title: "Institution overview" };
@@ -158,21 +158,21 @@ export default async function AdminOverviewPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DistributionBars
+        <DistributionChart
           title="By department"
           data={institution.byDepartment}
         />
-        <DistributionBars title="By semester" data={institution.bySemester} />
-        <DistributionBars
+        <DistributionChart title="By semester" data={institution.bySemester} />
+        <DistributionChart
           title="By admission quota"
           data={institution.byQuota}
         />
-        <DistributionBars
+        <DistributionChart
           title="By residence type"
           description="Where students live during term."
           data={institution.byResidence}
         />
-        <DistributionBars
+        <DistributionChart
           title="By home state"
           description="Where students are joining from."
           data={institution.byState.slice(0, 12)}
