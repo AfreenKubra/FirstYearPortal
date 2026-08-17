@@ -7,12 +7,20 @@ import { idleState } from "@/lib/actions/form-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
-export function LoginForm() {
+/**
+ * `portal` restricts which role may sign in through this form. It is posted
+ * as a hidden field and re-checked server-side against the `users` table —
+ * removing it in the browser gets the caller a normal sign-in, never a
+ * different role's dashboard.
+ */
+export function LoginForm({ portal }: { portal?: string } = {}) {
   const [state, formAction] = useFormState(login, idleState);
 
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
+
+      {portal && <input type="hidden" name="portal" value={portal} />}
 
       <TextInput
         label="Email address"

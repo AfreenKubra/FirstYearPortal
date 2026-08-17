@@ -57,11 +57,20 @@ This portal exists to:
 |---|---|---|
 | **Student** | First-year VTU students at HKBK | Complete profile once, track progress, get a roadmap and recommendations |
 | **Faculty** | Assigned mentors/department faculty | Find and understand assigned students; verify achievements; run assessments/events; mentor at scale |
-| **Admin** | Department heads, portal administrators | Institution-wide analytics, user/department management, oversight, reporting |
+| **HOD** | Heads of the five departments | See and report on every student in their own department, without waiting for assignments to be created |
+| **Admin** | Portal administrators | Institution-wide analytics, user/department management, oversight, reporting |
 
-No account is self-service. Students, faculty, and admins all register
-openly, but every account requires explicit approval by an authorised admin
-before it can be used (see Section 9, RBAC).
+Students, faculty, and heads of department register openly, but every account
+requires explicit approval by an authorised admin before it can be used (see
+Section 9, RBAC).
+
+**Administrator is not self-service and not requestable.** The role is
+restricted to an allow-list held in the database (`public.admin_allowlist`)
+and enforced by a trigger; the registration form no longer offers it. This
+closed a real hole: `handle_new_auth_user` reads the requested role from
+signup metadata, so anyone could previously register asking for `role:
+'admin'` and appear in the approvals queue looking like a legitimate request,
+one mis-click away from institution-wide access.
 
 ## 4. User stories by role
 
@@ -113,7 +122,7 @@ build status. Status values: **Shipped** (in the MVP, tested, working
 against a real schema), **Planned** (designed, not yet built), **Not
 started** (spec'd in the original brief, no design work done yet).
 
-### 5.1 Authentication & account lifecycle — *Shipped (student), Planned (faculty/admin)*
+### 5.1 Authentication & account lifecycle — *Shipped*
 - Registration, login, logout, forgot/reset password, email verification via
   Supabase Auth.
 - Account status: `pending → active`, or `rejected`/`suspended`.
@@ -126,10 +135,13 @@ started** (spec'd in the original brief, no design work done yet).
   decision; see migration `0008_approve_all_registrations.sql`. The tradeoff
   accepted: every first-year student now needs a manual decision, concentrated
   in the first days of term.)*
-- **Shipped:** student registration, login, logout, forgot/reset password,
-  role/status model, last-login tracking, audit-log table.
-- **Planned:** faculty/admin registration + admin approval queue, email
-  verification enforcement, rate limiting on auth endpoints.
+- **Shipped:** student, faculty, and HOD registration; login, logout,
+  forgot/reset password; role/status model; the admin approval queue and role
+  management; last-login tracking; audit log; a Head of Department sign-in
+  entrance at `/login/hod` whose role restriction is enforced in the server
+  action, not the page.
+- **Planned:** email verification enforcement, rate limiting on auth
+  endpoints.
 
 ### 5.2 Student registration & mandatory profile — *Shipped*
 - Multi-step registration capturing all Section-5 fields (identity, contact,
@@ -149,29 +161,38 @@ started** (spec'd in the original brief, no design work done yet).
 - **Planned:** achievements, assessments, events, resources, recommendations,
   AI roadmap, notifications, deadlines — each as its own module below.
 
-### 5.4 Achievements — *Not started*
+### 5.4 Achievements — *Shipped*
 - Students add/edit/delete achievement records (category, title, level,
   evidence upload, date).
-- Faculty verify or reject; verification status and remarks visible to the
-  student.
+- Faculty, heads of department, and admins verify or reject; verification
+  status and remarks visible to the student.
+- Triggers pin the verification columns so a student cannot mark their own
+  achievement verified, and editing a verified record sends it back to
+  pending.
+- **Planned:** virus scanning of evidence uploads (Section 9).
 
-### 5.5 Faculty registration, dashboard, and student directory — *Not started*
-- Faculty registration form; admin-gated approval.
-- `faculty_student_assignments` table scoping faculty visibility to
-  assigned department/semester/section/mentoring group.
-- Dashboard: assigned-student counts, completion/quota/goal/interest/domain
-  distributions, assessment and psychometric completion, students flagged
-  for follow-up.
-- Combinable filters (Section 11 of the original brief) with saved presets,
-  pagination, and CSV/PDF export of authorised results.
-- Individual student detail view with guardian-field masking for
-  non-mentors.
+### 5.5 Staff registration, dashboards, and student directory — *Shipped*
+- Faculty and Head of Department registration forms; admin-gated approval and
+  role assignment.
+- `faculty_student_assignments` scopes faculty visibility to assigned
+  department/semester/section/mentoring group. A HOD needs no assignment rows
+  — their department is their scope.
+- Dashboard: student counts, completion/quota/residence/semester
+  distributions, students flagged for follow-up.
+- Eleven combinable filters with URL-held state, pagination, charts over the
+  whole filtered set, and CSV export of authorised results.
+- Individual student detail view with guardian-field masking for anyone who is
+  not the assigned mentor, the head of that department, or an admin.
+- **Planned:** saved filter presets; PDF export.
 
-### 5.6 Admin dashboard & department management — *Not started*
-- Institution-wide and per-department analytics with bar/donut/line/stacked
-  charts, each with an accessible tabular alternative.
-- Department CRUD (departments already exist as a configurable DB table).
-- Faculty assignment management; account approval queue.
+### 5.6 Admin dashboard & department management — *Shipped*
+- Institution-wide and per-department analytics, each chart carrying an
+  accessible tabular alternative — the bars are drawn inside the table, so the
+  visual and accessible representations are the same DOM and cannot drift.
+- Institution-wide student directory with the same filters and export.
+- Department CRUD; account approval queue; role management.
+- **Planned:** donut and line/stacked chart forms where the data's job calls
+  for them.
 
 ### 5.7 Assessment engine — *Not started*
 - Question bank (single/multiple-choice, true/false, short/long answer,
@@ -252,10 +273,10 @@ started** (spec'd in the original brief, no design work done yet).
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Planning | Architecture, role matrix, DB plan, route map | **Done** |
-| 2. Foundation | Auth, RBAC, schema, branding, registration, mandatory profile gate | **Done (MVP shipped)** |
-| 3. Dashboards & analytics | Faculty dashboard, admin dashboard, filters, charts, student detail view | **Not started** |
-| 4. Extended modules | Achievements, assessments, events, resources, recommendations, AI roadmap, notifications, reports | **Not started** |
-| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — unit tests + typecheck + build pass for the MVP slice; no integration/e2e tests yet |
+| 2. Foundation | Auth, RBAC, schema, branding, registration, mandatory profile gate | **Done** |
+| 3. Dashboards & analytics | Faculty, HOD, and admin dashboards, filters, charts, student detail, CSV export | **Done** |
+| 4. Extended modules | Achievements **done**; assessments, events, resources, recommendations, AI roadmap, notifications **not started** | **Partial** |
+| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — 129 unit tests, typecheck, lint, and production build all pass; no integration/e2e tests yet |
 
 ## 9. Open questions for stakeholders
 

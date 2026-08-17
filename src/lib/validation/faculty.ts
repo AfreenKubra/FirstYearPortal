@@ -19,17 +19,23 @@ export const ADMIN_DESIGNATIONS = [
 ] as const;
 
 /**
- * One schema for both staff roles (PRD 5.1).
+ * One schema for every staff role (PRD 5.1).
  *
- * Department is required for faculty and optional for administrators — an
- * institution-wide admin does not belong to one department, and forcing an
- * arbitrary choice would corrupt the department analytics they are there to
- * read.
+ * Department is required for faculty and heads of department — both belong to
+ * exactly one — and optional for administrators, who are institution-wide and
+ * would corrupt the department analytics they exist to read if forced to pick
+ * one.
+ *
+ * `admin` is still accepted here even though the registration form no longer
+ * offers it: the schema's job is to describe what a valid request looks like,
+ * and a hand-crafted POST asking for `admin` should fail the allow-list check
+ * in the server action with a clear message, not fall out of schema parsing
+ * as a malformed field.
  */
 export const staffRegistrationSchema = z
   .object({
-    staffRole: z.enum(["faculty", "admin"], {
-      errorMap: () => ({ message: "Choose faculty or administrator." }),
+    staffRole: z.enum(["faculty", "hod", "admin"], {
+      errorMap: () => ({ message: "Choose faculty or head of department." }),
     }),
     fullName: z.string().trim().min(2, "Enter your full name.").max(120),
     employeeCode: z
@@ -50,7 +56,7 @@ export const staffRegistrationSchema = z
     message: "Passwords do not match.",
   })
   .refine(
-    (v) => (v.staffRole === "faculty" ? Boolean(v.departmentCode) : true),
+    (v) => (v.staffRole === "admin" ? true : Boolean(v.departmentCode)),
     { path: ["departmentCode"], message: "Select your department." },
   );
 

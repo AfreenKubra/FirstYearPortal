@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getOwnAdmin } from "@/lib/queries/admin";
+import { isAllowlistedAdmin, roleLabel } from "@/config/roles";
 import { fieldErrorsFrom, type ActionState } from "./form-state";
 
 /**
@@ -122,6 +123,129 @@ export async function decideAccount(
         : "suspended — they cannot sign in";
 
   return { status: "success", message: `Account ${outcome}.` };
+}
+
+// --- Role changes -----------------------------------------------------------
+
+const roleChangeSchema = z.object({
+  userId: z.string().uuid("Invalid account."),
+  role: z.enum(["student", "faculty", "hod", "admin"], {
+    errorMap: () => ({ message: "Unknown role." }),
+  }),
+});
+
+/**
+ * Moves an account between roles (PRD 5.6).
+ *
+ * This is how a Head of Department account comes into being: someone
+ * registers as faculty, an administrator approves them, and then promotes
+ * them to `hod` — which hands them their whole department through
+ * `can_faculty_view_student()` without a single assignment row.
+ *
+ * Administrator is refused here unless the address is allow-listed. The
+ * database trigger from migration 0011 would refuse it too; this check exists
+ * so the admin reads a sentence instead of a Postgres exception.
+ */
+export async function changeRole(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { status: "error", message: "Administrator access required." };
+  }
+
+  const parsed = roleChangeSchema.safeParse({
+    userId: formData.get("userId"),
+    role: formData.get("role"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Could not change that role.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const actorId = await currentUserId();
+  if (parsed.data.userId === actorId) {
+    // An admin demoting themselves could leave the institution with no
+    // administrator at all, and no way back in through the portal.
+    return {
+      status: "error",
+      message: "You cannot change your own role.",
+    };
+  }
+
+  const supabase = createClient();
+
+  const { data: target } = await supabase
+    .from("users")
+    .select("email, role")
+    .eq("id", parsed.data.userId)
+    .maybeSingle();
+
+  if (!target) {
+    return { status: "error", message: "That account no longer exists." };
+  }
+
+  if (parsed.data.role === "admin" && !isAllowlistedAdmin(target.email)) {
+    return {
+      status: "error",
+      message:
+        `${target.email} is not on the administrator allow-list, so it ` +
+        "cannot be given that role. Add the address to admin_allowlist first.",
+    };
+  }
+
+  // Faculty and HOD both render from a `faculty` row. Promoting an account
+  // that has none produces a login that can authenticate but has no shell to
+  // land in, so refuse rather than create that state.
+  if (parsed.data.role === "faculty" || parsed.data.role === "hod") {
+    const { data: staffRow } = await supabase
+      .from("faculty")
+      .select("id")
+      .eq("user_id", parsed.data.userId)
+      .maybeSingle();
+
+    if (!staffRow) {
+      return {
+        status: "error",
+        message:
+          "That account has no staff record, so it cannot hold a teaching " +
+          "role. Ask them to register at /register/staff first.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("users")
+    .update({ role: parsed.data.role })
+    .eq("id", parsed.data.userId);
+
+  if (error) {
+    return {
+      status: "error",
+      message: /allow-list/i.test(error.message)
+        ? "Administrator access is limited to the approved allow-list."
+        : "Could not change that role.",
+    };
+  }
+
+  await writeAudit(actorId, "account.role_change", "users", parsed.data.userId, {
+    from: target.role,
+    to: parsed.data.role,
+    decidedBy: admin.employeeCode,
+  });
+
+  revalidatePath("/admin/accounts");
+  revalidatePath("/admin");
+
+  return {
+    status: "success",
+    message: `${target.email} is now ${roleLabel(parsed.data.role)}.`,
+  };
 }
 
 // --- Departments ------------------------------------------------------------

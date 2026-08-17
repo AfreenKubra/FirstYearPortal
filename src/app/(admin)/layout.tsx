@@ -6,6 +6,7 @@ import { getOwnAdmin, getPendingCount } from "@/lib/queries/admin";
 function navItems(pendingCount: number): NavItem[] {
   return [
     { href: "/admin", label: "Overview" },
+    { href: "/admin/students", label: "All students" },
     {
       href: "/admin/accounts",
       label: "Account approvals",
@@ -26,8 +27,11 @@ export default async function AdminLayout({
   // independent check — and it fails closed if the admins row is missing,
   // which is the state a user promoted in the DB but never given an admin
   // profile would be in.
+  // Redirects to the blocked page rather than /login: middleware sends an
+  // admin-role session straight back to /admin, so /login here would be an
+  // endless bounce between the two.
   const admin = await getOwnAdmin();
-  if (!admin) redirect("/login");
+  if (!admin) redirect("/account-blocked?reason=no-staff-record");
 
   // Counted on every admin page render so the badge is never stale — it is a
   // single indexed COUNT, and a stale approval badge is worse than useless.

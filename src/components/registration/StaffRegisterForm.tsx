@@ -4,35 +4,18 @@ import { useState } from "react";
 import { useFormState } from "react-dom";
 import { registerStaff } from "@/lib/actions/faculty";
 import { idleState } from "@/lib/actions/form-state";
-import { ADMIN_DESIGNATIONS, DESIGNATIONS } from "@/lib/validation/faculty";
+import { DESIGNATIONS } from "@/lib/validation/faculty";
+import { STAFF_ROLE_CHOICES, type StaffRole } from "@/config/roles";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
-type StaffRole = "faculty" | "admin";
-
-const ROLE_CHOICES: Array<{
-  value: StaffRole;
-  label: string;
-  hint: string;
-}> = [
-  {
-    value: "faculty",
-    label: "Faculty",
-    hint: "Mentor and view students assigned to you",
-  },
-  {
-    value: "admin",
-    label: "Administrator",
-    hint: "Institution-wide analytics, approvals, and management",
-  },
-];
-
 /**
- * One form for both staff roles.
+ * One form for both self-service staff roles.
  *
- * Department is required for faculty and hidden for administrators — an
- * institution-wide admin has no single department, and forcing a pick would
- * put a false value into the analytics they exist to read.
+ * Administrator is deliberately absent. Since migration 0011 the role is
+ * restricted to an allow-list held in the database, so offering it here would
+ * be offering something almost every visitor would be refused — and a request
+ * that cannot succeed is worse than no request at all.
  */
 export function StaffRegisterForm({
   departments,
@@ -43,7 +26,9 @@ export function StaffRegisterForm({
   const [role, setRole] = useState<StaffRole>("faculty");
   const errors = state.fieldErrors ?? {};
 
-  const designations = role === "faculty" ? DESIGNATIONS : ADMIN_DESIGNATIONS;
+  // A head of department's designation is not a choice — it is the role.
+  const designations =
+    role === "hod" ? (["Head of Department"] as const) : DESIGNATIONS;
 
   return (
     <form action={formAction} noValidate className="space-y-4">
@@ -59,7 +44,7 @@ export function StaffRegisterForm({
           I am requesting access as
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
-          {ROLE_CHOICES.map((choice) => (
+          {STAFF_ROLE_CHOICES.map((choice) => (
             <label
               key={choice.value}
               className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm transition-colors hover:border-indigo-300 has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
@@ -131,15 +116,13 @@ export function StaffRegisterForm({
         />
       </div>
 
-      {role === "faculty" && (
-        <Select
-          label="Department"
-          name="departmentCode"
-          placeholder="Select your department"
-          options={departments.map((d) => ({ value: d.code, label: d.name }))}
-          error={errors.departmentCode}
-        />
-      )}
+      <Select
+        label={role === "hod" ? "Department you head" : "Department"}
+        name="departmentCode"
+        placeholder="Select your department"
+        options={departments.map((d) => ({ value: d.code, label: d.name }))}
+        error={errors.departmentCode}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput
@@ -160,7 +143,7 @@ export function StaffRegisterForm({
       </div>
 
       <SubmitButton pendingLabel="Submitting…" className="w-full">
-        Request {role === "faculty" ? "a faculty" : "an administrator"} account
+        Request {role === "hod" ? "a head of department" : "a faculty"} account
       </SubmitButton>
     </form>
   );
