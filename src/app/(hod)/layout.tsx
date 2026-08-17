@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { StudentNav, type NavItem } from "@/components/layout/StudentNav";
+import { PortalSwitcher } from "@/components/layout/PortalSwitcher";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { getPendingVerificationCount } from "@/lib/queries/achievements";
@@ -35,7 +36,9 @@ export default async function HodLayout({
 }) {
   const staff = await getOwnStaff();
   if (!staff) redirect("/account-blocked?reason=no-staff-record");
-  if (staff.role !== "hod") redirect("/login");
+  // Membership, not equality: this account may be an administrator whose
+  // primary role is `admin` and who also heads a department.
+  if (!staff.roles.includes("hod")) redirect("/login");
 
   const pendingVerifications = await getPendingVerificationCount();
 
@@ -44,6 +47,7 @@ export default async function HodLayout({
       <StudentNav
         items={navItems(pendingVerifications)}
         studentName={staff.fullName}
+        portalSwitcher={<PortalSwitcher roles={staff.roles} current="hod" />}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">

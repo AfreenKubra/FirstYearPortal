@@ -6,7 +6,7 @@ import { directoryCsvResponse } from "@/lib/directory/export";
 
 export async function GET(request: NextRequest) {
   const staff = await getOwnStaff();
-  if (!staff || staff.role !== "hod") {
+  if (!staff || !staff.roles.includes("hod")) {
     return new NextResponse("Not authorised", { status: 403 });
   }
 

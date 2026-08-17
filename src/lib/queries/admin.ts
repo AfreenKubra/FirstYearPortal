@@ -128,7 +128,12 @@ export async function getAdminOverview(): Promise<AdminOverview> {
 export type PendingAccount = {
   userId: string;
   email: string;
+  /** Primary role — where the account lands at sign-in. */
   role: string;
+  /** Every role held, including the primary one (migration 0012). */
+  roles: string[];
+  /** True when a `faculty` row exists, so teaching roles can be granted. */
+  hasStaffRecord: boolean;
   status: string;
   createdAt: string;
   fullName: string | null;
@@ -178,13 +183,22 @@ export async function getAccountQueue(): Promise<{
   // All three profile tables are consulted: an administrator's details live
   // in `admins`, a faculty member's in `faculty`, a student's in `students`.
   // Looking in only one would leave most requests showing as a bare email.
-  const [facultyRows, adminRows, studentRows] = await Promise.all([
+  const [facultyRows, adminRows, studentRows, roleRows] = await Promise.all([
     supabase
       .from("faculty")
       .select("user_id, full_name, employee_code, department_code, designation"),
     supabase.from("admins").select("user_id, full_name, employee_code, designation"),
     supabase.from("students").select("user_id, full_name, usn, department_code"),
+    supabase.from("user_roles").select("user_id, role"),
   ]);
+
+  const rolesByUser = new Map<string, string[]>();
+  for (const row of roleRows.data ?? []) {
+    rolesByUser.set(row.user_id, [
+      ...(rolesByUser.get(row.user_id) ?? []),
+      row.role,
+    ]);
+  }
 
   const facultyByUser = new Map(
     (facultyRows.data ?? []).map((f) => [f.user_id, f]),
@@ -201,10 +215,20 @@ export async function getAccountQueue(): Promise<{
     const admin = adminsByUser.get(account.id);
     const student = studentsByUser.get(account.id);
 
+    // The primary role is folded in rather than assumed present in
+    // user_roles, matching what middleware does — a row predating migration
+    // 0012 would otherwise show as having no roles at all.
+    const held = new Set<string>([
+      account.role,
+      ...(rolesByUser.get(account.id) ?? []),
+    ]);
+
     return {
       userId: account.id,
       email: account.email,
       role: account.role,
+      roles: [...held],
+      hasStaffRecord: faculty !== undefined,
       status: account.status,
       createdAt: account.created_at,
       fullName:

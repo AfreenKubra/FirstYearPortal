@@ -106,6 +106,11 @@ const CHECKS = [
     label: "HOD scope + administrator allow-list",
     probe: () => tableExists("admin_allowlist"),
   },
+  {
+    migration: "0012_multiple_roles.sql",
+    label: "one account, multiple roles",
+    probe: () => tableExists("user_roles"),
+  },
 ];
 
 console.log(`\nChecking ${url}\n`);

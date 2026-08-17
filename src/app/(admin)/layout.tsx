@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { StudentNav, type NavItem } from "@/components/layout/StudentNav";
+import { PortalSwitcher } from "@/components/layout/PortalSwitcher";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { getOwnAdmin, getPendingCount } from "@/lib/queries/admin";
+import { getViewer } from "@/lib/queries/roles";
 
 function navItems(pendingCount: number): NavItem[] {
   return [
@@ -35,11 +37,20 @@ export default async function AdminLayout({
 
   // Counted on every admin page render so the badge is never stale — it is a
   // single indexed COUNT, and a stale approval badge is worse than useless.
-  const pendingCount = await getPendingCount();
+  const [pendingCount, viewer] = await Promise.all([
+    getPendingCount(),
+    getViewer(),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <StudentNav items={navItems(pendingCount)} studentName={admin.fullName} />
+      <StudentNav
+        items={navItems(pendingCount)}
+        studentName={admin.fullName}
+        portalSwitcher={
+          <PortalSwitcher roles={viewer?.roles ?? []} current="admin" />
+        }
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="hidden items-center justify-between border-b border-indigo-100 bg-white px-8 py-3 lg:flex">
