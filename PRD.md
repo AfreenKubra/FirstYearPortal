@@ -276,7 +276,7 @@ started** (spec'd in the original brief, no design work done yet).
 | 2. Foundation | Auth, RBAC, schema, branding, registration, mandatory profile gate | **Done** |
 | 3. Dashboards & analytics | Faculty, HOD, and admin dashboards, filters, charts, student detail, CSV export | **Done** |
 | 4. Extended modules | Achievements **done**; assessments, events, resources, recommendations, AI roadmap, notifications **not started** | **Partial** |
-| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — 129 unit tests, typecheck, lint, and production build all pass; no integration/e2e tests yet |
+| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — 136 unit tests, typecheck, lint, and production build all pass; no integration/e2e tests yet |
 
 ## 9. Open questions for stakeholders
 

@@ -112,6 +112,20 @@ layers need updating together.
 immediately without waiting for token refresh — every check re-reads the
 table.
 
+**Roles are a set, not a single value** (migration 0012). The institution's
+real structure needs it: the head of AIML is also a portal administrator, and
+the portal administrator also teaches, and each of them could previously reach
+only one of their two portals. `users.role` remains the *primary* role — the
+home route and the label — while `public.user_roles` holds the full set that
+grants access. A trigger keeps the primary role inside the set, so no caller
+has to consult two sources.
+
+The join table was chosen over a `roles text[]` column because a column would
+have to be kept in step with `users.role` by hand and every policy would need
+to unnest it. `has_role()` then let `is_admin()`, `current_hod_department()`,
+and `current_faculty_id()` be redefined *in place* — same names, same
+signatures — so not one of the policies written against them had to change.
+
 **Head of Department** is a role, not a job title. A HOD's profile lives in
 the same `faculty` table as a mentor's — they are teaching staff with a
 department — and what separates them is `users.role = 'hod'`, which is what

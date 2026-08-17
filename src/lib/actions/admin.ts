@@ -127,26 +127,30 @@ export async function decideAccount(
 
 // --- Role changes -----------------------------------------------------------
 
-const roleChangeSchema = z.object({
+const ROLE_VALUES = ["student", "faculty", "hod", "admin"] as const;
+
+const roleSetSchema = z.object({
   userId: z.string().uuid("Invalid account."),
-  role: z.enum(["student", "faculty", "hod", "admin"], {
-    errorMap: () => ({ message: "Unknown role." }),
+  primary: z.enum(ROLE_VALUES, {
+    errorMap: () => ({ message: "Choose a primary role." }),
   }),
+  roles: z.array(z.enum(ROLE_VALUES)).min(1, "An account needs at least one role."),
 });
 
 /**
- * Moves an account between roles (PRD 5.6).
+ * Sets the complete role set for an account (migration 0012).
  *
- * This is how a Head of Department account comes into being: someone
- * registers as faculty, an administrator approves them, and then promotes
- * them to `hod` — which hands them their whole department through
- * `can_faculty_view_student()` without a single assignment row.
+ * Roles are a set here, not a single value: the head of a department is also
+ * an administrator, and the administrator also teaches. `primary` decides
+ * where the account lands at sign-in and how it is labelled; the rest decide
+ * which areas it may enter.
  *
- * Administrator is refused here unless the address is allow-listed. The
- * database trigger from migration 0011 would refuse it too; this check exists
- * so the admin reads a sentence instead of a Postgres exception.
+ * Reconciles rather than replaces wholesale — revoking every row and
+ * re-inserting would briefly leave the account with no roles at all, and an
+ * administrator editing their own institution's access should never pass
+ * through a state where nobody can administer it.
  */
-export async function changeRole(
+export async function setRoles(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -155,27 +159,28 @@ export async function changeRole(
     return { status: "error", message: "Administrator access required." };
   }
 
-  const parsed = roleChangeSchema.safeParse({
+  const submitted = formData.getAll("roles").map(String);
+  const primary = String(formData.get("primary") ?? "");
+
+  const parsed = roleSetSchema.safeParse({
     userId: formData.get("userId"),
-    role: formData.get("role"),
+    primary,
+    // The primary role is always part of the set — a home route the account
+    // may not enter is a redirect loop.
+    roles: Array.from(new Set([primary, ...submitted])),
   });
 
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Could not change that role.",
+      message: "Could not change those roles.",
       fieldErrors: fieldErrorsFrom(parsed.error),
     };
   }
 
   const actorId = await currentUserId();
   if (parsed.data.userId === actorId) {
-    // An admin demoting themselves could leave the institution with no
-    // administrator at all, and no way back in through the portal.
-    return {
-      status: "error",
-      message: "You cannot change your own role.",
-    };
+    return { status: "error", message: "You cannot change your own roles." };
   }
 
   const supabase = createClient();
@@ -190,7 +195,10 @@ export async function changeRole(
     return { status: "error", message: "That account no longer exists." };
   }
 
-  if (parsed.data.role === "admin" && !isAllowlistedAdmin(target.email)) {
+  if (
+    parsed.data.roles.includes("admin") &&
+    !isAllowlistedAdmin(target.email)
+  ) {
     return {
       status: "error",
       message:
@@ -199,10 +207,10 @@ export async function changeRole(
     };
   }
 
-  // Faculty and HOD both render from a `faculty` row. Promoting an account
-  // that has none produces a login that can authenticate but has no shell to
-  // land in, so refuse rather than create that state.
-  if (parsed.data.role === "faculty" || parsed.data.role === "hod") {
+  // Faculty and HOD both render from a `faculty` row. Granting either to an
+  // account without one produces a login that authenticates and then has no
+  // shell to land in.
+  if (parsed.data.roles.some((role) => role === "faculty" || role === "hod")) {
     const { data: staffRow } = await supabase
       .from("faculty")
       .select("id")
@@ -219,23 +227,56 @@ export async function changeRole(
     }
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ role: parsed.data.role })
-    .eq("id", parsed.data.userId);
+  const { data: existing } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", parsed.data.userId);
 
-  if (error) {
-    return {
-      status: "error",
-      message: /allow-list/i.test(error.message)
-        ? "Administrator access is limited to the approved allow-list."
-        : "Could not change that role.",
-    };
+  const held = new Set((existing ?? []).map((r) => r.role));
+  const wanted = new Set(parsed.data.roles);
+
+  const toAdd = parsed.data.roles.filter((role) => !held.has(role));
+  const toRemove = [...held].filter((role) => !wanted.has(role));
+
+  if (toAdd.length > 0) {
+    const { error } = await supabase
+      .from("user_roles")
+      .insert(toAdd.map((role) => ({ user_id: parsed.data.userId, role })));
+
+    if (error) {
+      return {
+        status: "error",
+        message: /allow-list/i.test(error.message)
+          ? "Administrator access is limited to the approved allow-list."
+          : "Could not grant those roles.",
+      };
+    }
   }
 
-  await writeAudit(actorId, "account.role_change", "users", parsed.data.userId, {
-    from: target.role,
-    to: parsed.data.role,
+  if (parsed.data.primary !== target.role) {
+    const { error } = await supabase
+      .from("users")
+      .update({ role: parsed.data.primary })
+      .eq("id", parsed.data.userId);
+
+    if (error) {
+      return { status: "error", message: "Could not set the primary role." };
+    }
+  }
+
+  // Removals go last: the primary role is written above and the sync trigger
+  // re-adds it, so deleting first would drop a row that is about to return.
+  if (toRemove.length > 0) {
+    await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", parsed.data.userId)
+      .in("role", toRemove);
+  }
+
+  await writeAudit(actorId, "account.roles_set", "users", parsed.data.userId, {
+    primary: parsed.data.primary,
+    roles: parsed.data.roles,
     decidedBy: admin.employeeCode,
   });
 
@@ -244,7 +285,9 @@ export async function changeRole(
 
   return {
     status: "success",
-    message: `${target.email} is now ${roleLabel(parsed.data.role)}.`,
+    message: `${target.email}: ${parsed.data.roles
+      .map((r) => roleLabel(r))
+      .join(", ")} (primary ${roleLabel(parsed.data.primary)}).`,
   };
 }
 
