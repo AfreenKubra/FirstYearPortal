@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { branding } from "@/config/branding";
+import { homeForRole } from "@/config/roles";
 import { registrationSchema } from "@/lib/validation/student";
 import {
   forgotPasswordSchema,
@@ -174,6 +175,29 @@ export async function login(
     .eq("id", data.user.id)
     .single();
 
+  // --- Portal restriction --------------------------------------------------
+  //
+  // A role-specific entrance (currently /login/hod) posts the role it serves.
+  // The check is here rather than on the page because the page cannot enforce
+  // anything: the field is a hidden input a caller can edit or delete. What
+  // makes the restriction real is that the role is read back from the `users`
+  // table and compared server-side, and a mismatch ends the session rather
+  // than redirecting — otherwise the wrong-role visitor would walk away
+  // holding valid credentials for a portal they were just refused.
+  const portal = formData.get("portal");
+  if (typeof portal === "string" && portal.length > 0) {
+    if (!account || account.role !== portal) {
+      await supabase.auth.signOut();
+      return {
+        status: "error",
+        message:
+          portal === "hod"
+            ? "This entrance is for Head of Department accounts. Sign in from the main page instead."
+            : "This account cannot sign in through this entrance.",
+      };
+    }
+  }
+
   // Only an approved account gets a session.
   //
   // The credentials were correct, so Supabase has already issued one — it has
@@ -209,13 +233,7 @@ export async function login(
 
   revalidatePath("/", "layout");
 
-  redirect(
-    account.role === "admin"
-      ? "/admin"
-      : account.role === "faculty"
-        ? "/faculty"
-        : "/dashboard",
-  );
+  redirect(homeForRole(account.role));
 }
 
 export async function logout() {

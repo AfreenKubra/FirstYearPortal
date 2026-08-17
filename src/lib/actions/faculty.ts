@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { staffRegistrationSchema } from "@/lib/validation/faculty";
+import { isAllowlistedAdmin } from "@/config/roles";
 import { fieldErrorsFrom, type ActionState } from "./form-state";
 
 /**
@@ -43,6 +44,20 @@ export async function registerStaff(
   }
 
   const values = parsed.data;
+
+  // Administrator is allow-list-only (migration 0011). Checked here so the
+  // caller gets a sentence rather than a raw Postgres exception from the
+  // `users_guard_admin_allowlist` trigger — which is what would stop this
+  // anyway, and remains the check that actually counts.
+  if (values.staffRole === "admin" && !isAllowlistedAdmin(values.email)) {
+    return {
+      status: "error",
+      message:
+        "Administrator accounts are not self-service. Ask an existing " +
+        "administrator to set one up for you.",
+    };
+  }
+
   const supabase = createClient();
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -68,8 +83,13 @@ export async function registerStaff(
 
   const userId = signUpData.user.id;
 
+  // Faculty and heads of department share the `faculty` table — a HOD is a
+  // member of teaching staff with a department, and what separates them is
+  // `users.role`, which every RLS policy keys off. One staff table rather
+  // than a near-duplicate `hods` is what lets a single set of policies serve
+  // both.
   const { error: profileError } =
-    values.staffRole === "faculty"
+    values.staffRole !== "admin"
       ? await supabase.from("faculty").insert({
           user_id: userId,
           full_name: values.fullName,

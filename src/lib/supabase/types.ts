@@ -11,9 +11,17 @@
  * confusing type error far from the cause.
  */
 
-export type UserRole = "student" | "faculty" | "admin";
+import type { Role } from "@/config/roles";
+
+/** Mirrors `public.user_role`; the values live in `config/roles.ts`. */
+export type UserRole = Role;
 export type AccountStatus = "pending" | "active" | "rejected" | "suspended";
 import type { ResidenceType } from "@/config/residence";
+import type {
+  AchievementCategory,
+  AchievementLevel,
+  VerificationStatus,
+} from "@/config/achievements";
 
 export type { ResidenceType };
 export type AdmissionQuota =
@@ -206,6 +214,66 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      achievements: {
+        Row: {
+          id: string;
+          student_id: string;
+          category: AchievementCategory;
+          title: string;
+          description: string | null;
+          level: AchievementLevel;
+          organisation: string | null;
+          achieved_on: string;
+          verification_status: VerificationStatus;
+          verified_by: string | null;
+          verified_at: string | null;
+          remarks: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          student_id: string;
+          category: AchievementCategory;
+          title: string;
+          description?: string | null;
+          level: AchievementLevel;
+          organisation?: string | null;
+          achieved_on: string;
+        };
+        Update: Partial<{
+          category: AchievementCategory;
+          title: string;
+          description: string | null;
+          level: AchievementLevel;
+          organisation: string | null;
+          achieved_on: string;
+          verification_status: VerificationStatus;
+          verified_by: string | null;
+          verified_at: string | null;
+          remarks: string | null;
+        }>;
+        Relationships: [];
+      };
+      achievement_documents: {
+        Row: {
+          id: string;
+          achievement_id: string;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          size_bytes: number;
+          uploaded_at: string;
+        };
+        Insert: {
+          achievement_id: string;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          size_bytes: number;
+        };
+        Update: never;
+        Relationships: [];
+      };
       admins: {
         Row: {
           id: string;
@@ -297,6 +365,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      admin_allowlist: {
+        Row: { email: string; note: string | null; added_at: string };
+        Insert: { email: string; note?: string | null };
+        Update: Partial<{ note: string | null }>;
+        Relationships: [];
+      };
       departments: {
         Row: { code: string; name: string; is_active: boolean; created_at: string };
         Insert: { code: string; name: string; is_active?: boolean };
@@ -367,6 +441,11 @@ export type Database = {
     Functions: {
       current_user_role: { Args: Record<string, never>; Returns: UserRole };
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      is_hod: { Args: Record<string, never>; Returns: boolean };
+      current_hod_department: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
       current_faculty_id: { Args: Record<string, never>; Returns: string | null };
       can_faculty_view_student: {
         Args: { p_student_id: string; p_mentor_only?: boolean };
