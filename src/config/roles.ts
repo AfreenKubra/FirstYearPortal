@@ -50,6 +50,35 @@ export function homeForRole(value: string | null | undefined): string {
   return isRole(value) ? ROLE_HOME[value] : "/dashboard";
 }
 
+/**
+ * The complete set of roles an account holds (migration 0012).
+ *
+ * An account may hold several: the head of a department is also an
+ * administrator, and the administrator also teaches. `users.role` is the
+ * primary one — where they land at sign-in — and `user_roles` holds the rest.
+ *
+ * The primary role is folded in rather than trusted to be present in the
+ * granted list. A database trigger keeps the two in step, but a row written
+ * before 0012, or by a path that bypassed the trigger, would otherwise leave
+ * the account locked out of its own home route — and a redirect loop is a far
+ * worse failure than a duplicated set member.
+ *
+ * Unrecognised values are dropped rather than passed through: these decide
+ * route access, so a role the application does not know about must not be
+ * treated as one it does.
+ */
+export function mergeRoles(
+  primary: string | null | undefined,
+  granted: ReadonlyArray<{ role: string }> | null | undefined,
+): Role[] {
+  const held = new Set<Role>();
+  if (isRole(primary)) held.add(primary);
+  for (const row of granted ?? []) {
+    if (isRole(row.role)) held.add(row.role);
+  }
+  return [...held];
+}
+
 // --- Administrator allow-list ------------------------------------------------
 
 /**

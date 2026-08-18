@@ -365,6 +365,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      user_roles: {
+        Row: { user_id: string; role: UserRole; granted_at: string };
+        Insert: { user_id: string; role: UserRole };
+        Update: never;
+        Relationships: [];
+      };
       admin_allowlist: {
         Row: { email: string; note: string | null; added_at: string };
         Insert: { email: string; note?: string | null };
@@ -442,6 +448,8 @@ export type Database = {
       current_user_role: { Args: Record<string, never>; Returns: UserRole };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_hod: { Args: Record<string, never>; Returns: boolean };
+      has_role: { Args: { p_role: UserRole }; Returns: boolean };
+      current_roles: { Args: Record<string, never>; Returns: UserRole[] };
       current_hod_department: {
         Args: Record<string, never>;
         Returns: string | null;

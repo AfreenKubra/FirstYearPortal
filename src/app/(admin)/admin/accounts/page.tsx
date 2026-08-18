@@ -42,6 +42,8 @@ function AccountCard({
     userId: string;
     email: string;
     role: string;
+    roles: string[];
+    hasStaffRecord: boolean;
     status: string;
     createdAt: string;
     fullName: string | null;
@@ -59,9 +61,27 @@ function AccountCard({
             {account.fullName ?? account.email}
           </p>
           <StatusPill status={account.status} />
-          <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800">
-            {roleLabel(account.role)}
-          </span>
+          {/* The primary role first and marked, then any additional ones —
+              an account holding two roles should read as holding two. */}
+          {[
+            account.role,
+            ...account.roles.filter((r) => r !== account.role),
+          ].map((role) => (
+            <span
+              key={role}
+              className={[
+                "rounded-md border px-2 py-0.5 text-xs font-medium",
+                role === account.role
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-800"
+                  : "border-brass-300/60 bg-brass-50 text-brass-800",
+              ].join(" ")}
+            >
+              {roleLabel(role)}
+              {role === account.role && account.roles.length > 1 && (
+                <span className="ml-1 text-[0.625rem] opacity-70">home</span>
+              )}
+            </span>
+          ))}
         </div>
         <p className="mt-1 break-all text-sm text-ink-muted">{account.email}</p>
         <p className="mt-0.5 text-xs text-ink-faint">
@@ -86,7 +106,9 @@ function AccountCard({
         <RoleControl
           userId={account.userId}
           email={account.email}
-          role={account.role}
+          primaryRole={account.role}
+          roles={account.roles}
+          hasStaffRecord={account.hasStaffRecord}
           name={account.fullName ?? account.email}
           isSelf={account.isSelf}
         />

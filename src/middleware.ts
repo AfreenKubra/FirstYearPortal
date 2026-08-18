@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/types";
-import { homeForRole, ROLE_PREFIXES } from "@/config/roles";
+import { homeForRole, mergeRoles, ROLE_PREFIXES } from "@/config/roles";
 
 /**
  * Security layer 1 of 3 (ARCHITECTURE section 3).
@@ -84,13 +84,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- Authenticated: read role/status from the shadow table ---------------
-  // Read from `users`, not from the JWT, so a suspension or role change takes
-  // effect on the very next request rather than at token refresh.
-  const { data: account } = await supabase
-    .from("users")
-    .select("role, status")
-    .eq("id", user.id)
-    .single();
+  // Read from `users` and `user_roles`, not from the JWT, so a suspension or
+  // role change takes effect on the very next request rather than at token
+  // refresh. Both are indexed single-key lookups and are issued together.
+  const [{ data: account }, { data: grantedRoles }] = await Promise.all([
+    supabase.from("users").select("role, status").eq("id", user.id).single(),
+    supabase.from("user_roles").select("role").eq("user_id", user.id),
+  ]);
 
   if (!account) {
     // Auth identity with no shadow row — the signup trigger did not complete.
@@ -113,6 +113,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/pending-approval", request.url));
   }
 
+  // An account may hold several roles (migration 0012): the head of a
+  // department is also an administrator, the administrator also teaches.
+  // `users.role` stays the primary one — where they land at sign-in — while
+  // the set below decides which areas they may enter. The primary role is
+  // included defensively in case the sync trigger has not run for a row.
+  const roles = mergeRoles(account.role, grantedRoles);
   const home = homeForRole(account.role);
 
   // A signed-in user on a login/register page belongs at their own home.
@@ -122,13 +128,15 @@ export async function middleware(request: NextRequest) {
 
   // --- Cross-role access ---------------------------------------------------
   const owned = ROLE_PREFIXES.find((entry) => pathname.startsWith(entry.prefix));
-  if (owned && owned.role !== account.role) {
+  if (owned && !roles.includes(owned.role)) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
   // --- Student profile gate (PRD 5.2) --------------------------------------
   // Applies to every student-owned path except the gate itself, so a student
   // cannot skip it by deep-linking to a sibling page such as /achievements.
+  // Keyed off the primary role: a staff account that also holds `student`
+  // would otherwise be held at a gate meant for first-years.
   if (
     account.role === "student" &&
     owned?.role === "student" &&

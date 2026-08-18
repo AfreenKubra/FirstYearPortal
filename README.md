@@ -11,7 +11,7 @@ independent layers.
 ![Next.js](https://img.shields.io/badge/Next.js-14-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e)
-![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-136%20passing-brightgreen)
 
 ---
 
@@ -84,7 +84,26 @@ The `admin` role is restricted to an allow-list held in the database
 and until migration 0011 anything could reach it — `handle_new_auth_user`
 takes the role straight from signup metadata, so a stranger could register
 asking for `role: 'admin'` and sit in the approvals queue looking like a
-legitimate request. A trigger now refuses the write outright.
+legitimate request. A trigger now refuses the write outright, on both
+`users.role` and the `user_roles` table.
+
+### One account, several roles
+
+Roles are a set, not a single value (migration 0012). The real structure of
+the institution needs it: the head of AIML is also a portal administrator, and
+the portal administrator also teaches. Before this each of them could reach
+only one of their two portals.
+
+`users.role` survives as the **primary** role — it decides where the account
+lands after sign-in and how it is labelled in the approvals queue — while
+`public.user_roles` holds the full set that decides what may be reached. A
+trigger keeps the primary role present in the set, so nothing has to consult
+two sources to answer "may this account do X".
+
+Accounts holding more than one role get a **Your portals** switcher in the
+sidebar. Rendering that link grants nothing: middleware re-checks the role set
+on every request and RLS re-checks it in the database, so a hand-typed URL to
+an area the account does not hold is refused exactly as before.
 
 ## Security model
 
@@ -168,6 +187,7 @@ In the Supabase dashboard, open **SQL Editor** and run each file in
 | `0009_achievements.sql` | Achievements, evidence documents, verification guards, private storage bucket |
 | `0010_hod_role_enum.sql` | Adds `hod` to the `user_role` enum — **on its own, nothing else** |
 | `0011_hod_scope_and_admin_allowlist.sql` | HOD department scope, administrator allow-list and its guard trigger |
+| `0012_multiple_roles.sql` | `user_roles` join table, so one account can hold several roles |
 
 **0010 and 0011 must be run as two separate statements.** PostgreSQL will not
 let one transaction add an enum value and then use it, and both the SQL Editor
@@ -362,7 +382,7 @@ the caller is not entitled to.
 npm test
 ```
 
-129 unit tests covering profile-completion gate logic, every validation schema,
+136 unit tests covering profile-completion gate logic, every validation schema,
 directory filter parsing, CSV escaping, and analytics aggregation.
 
 Integration, RLS-policy, and end-to-end tests are planned.
