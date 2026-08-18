@@ -33,7 +33,7 @@ export default function LoginPage({
               href="/register"
               className="rounded font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
             >
-              Create a student account
+              Create an account
             </Link>
           </p>
           <p>
