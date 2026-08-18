@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Logo } from "@/components/ui/Logo";
 
 export type NavItem = {
@@ -23,9 +23,12 @@ export type NavItem = {
 export function StudentNav({
   items,
   studentName,
+  portalSwitcher,
 }: {
   items: NavItem[];
   studentName: string;
+  /** Rendered above the links for accounts holding more than one role. */
+  portalSwitcher?: ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -107,6 +110,7 @@ export function StudentNav({
           aria-label="Student sections"
           className="border-b border-indigo-100 bg-white px-4 py-3 lg:hidden"
         >
+          {portalSwitcher}
           {links}
         </nav>
       )}
@@ -116,6 +120,7 @@ export function StudentNav({
         <div className="border-b border-indigo-100 px-5 py-4">
           <Logo />
         </div>
+        {portalSwitcher}
         <nav aria-label="Student sections" className="flex-1 px-3 py-4">
           {links}
         </nav>

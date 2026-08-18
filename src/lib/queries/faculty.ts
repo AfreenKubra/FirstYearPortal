@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { EMPTY_FILTERS, type StudentFilters } from "@/lib/faculty/filters";
 import { listAllMatchingStudents, type DirectoryRow } from "./directory";
+import { getViewer } from "./roles";
 import { residenceLabel } from "@/config/residence";
 import type { Role } from "@/config/roles";
 
@@ -22,8 +23,10 @@ export type StaffRecord = {
   phone: string;
   departmentCode: string;
   designation: string;
-  /** From the `users` shadow table, not the profile row. */
+  /** The account's primary role — where it lands at sign-in. */
   role: Role;
+  /** Every role held. An account can be both a HOD and an administrator. */
+  roles: Role[];
 };
 
 /** Kept as the old name so existing faculty screens read unchanged. */
@@ -39,33 +42,36 @@ export type FacultyRecord = StaffRecord;
 export async function getOwnStaff(): Promise<StaffRecord | null> {
   const supabase = createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const [{ data }, { data: account }] = await Promise.all([
-    supabase
-      .from("faculty")
-      .select(
-        "id, full_name, employee_code, email, phone, department_code, designation",
-      )
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
+  const [{ data: viewer }, staffRow] = await Promise.all([
+    getViewer().then((v) => ({ data: v })),
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("faculty")
+        .select(
+          "id, full_name, employee_code, email, phone, department_code, designation",
+        )
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return data;
+    })(),
   ]);
 
-  if (!data || !account) return null;
+  if (!staffRow || !viewer) return null;
 
   return {
-    id: data.id,
-    fullName: data.full_name,
-    employeeCode: data.employee_code,
-    email: data.email,
-    phone: data.phone,
-    departmentCode: data.department_code,
-    designation: data.designation,
-    role: account.role,
+    id: staffRow.id,
+    fullName: staffRow.full_name,
+    employeeCode: staffRow.employee_code,
+    email: staffRow.email,
+    phone: staffRow.phone,
+    departmentCode: staffRow.department_code,
+    designation: staffRow.designation,
+    role: viewer.primaryRole,
+    roles: viewer.roles,
   };
 }
 

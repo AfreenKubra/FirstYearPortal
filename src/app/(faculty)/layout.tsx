@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { StudentNav, type NavItem } from "@/components/layout/StudentNav";
+import { PortalSwitcher } from "@/components/layout/PortalSwitcher";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { getOwnFaculty } from "@/lib/queries/faculty";
 import { getPendingVerificationCount } from "@/lib/queries/achievements";
@@ -46,6 +47,9 @@ export default async function FacultyLayout({
       <StudentNav
         items={navItems(pendingVerifications)}
         studentName={faculty.fullName}
+        portalSwitcher={
+          <PortalSwitcher roles={faculty.roles} current="faculty" />
+        }
       />
 
       <div className="flex min-w-0 flex-1 flex-col">

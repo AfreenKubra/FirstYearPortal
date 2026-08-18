@@ -9,6 +9,7 @@ import {
   homeForRole,
   isAllowlistedAdmin,
   isRole,
+  mergeRoles,
   roleLabel,
 } from "../roles";
 
@@ -124,6 +125,62 @@ describe("isAllowlistedAdmin", () => {
     expect(isAllowlistedAdmin("xhod.aiml@hkbk.edu.in")).toBe(false);
     expect(isAllowlistedAdmin("hod.aiml@hkbk.edu.in.evil.com")).toBe(false);
     expect(isAllowlistedAdmin("hod.aiml@hkbk-edu.in")).toBe(false);
+  });
+});
+
+describe("mergeRoles", () => {
+  it("combines the primary role with the granted ones", () => {
+    expect(mergeRoles("admin", [{ role: "hod" }]).sort()).toEqual([
+      "admin",
+      "hod",
+    ]);
+  });
+
+  it("always includes the primary role, even if user_roles is empty", () => {
+    // The account's home route is derived from the primary role. If that role
+    // were missing from the set, middleware would refuse the very page it
+    // redirects to — a loop the user experiences as a dead tab.
+    expect(mergeRoles("admin", [])).toEqual(["admin"]);
+    expect(mergeRoles("faculty", null)).toEqual(["faculty"]);
+    expect(mergeRoles("hod", undefined)).toEqual(["hod"]);
+  });
+
+  it("does not duplicate a primary role that is also granted", () => {
+    expect(mergeRoles("hod", [{ role: "hod" }])).toEqual(["hod"]);
+  });
+
+  it("drops roles the application does not recognise", () => {
+    // These values decide route access. An unknown role must not be treated
+    // as a known one just because the database happened to contain it.
+    expect(mergeRoles("admin", [{ role: "superuser" }])).toEqual(["admin"]);
+    expect(mergeRoles("admin", [{ role: "" }])).toEqual(["admin"]);
+  });
+
+  it("returns an empty set when the primary role is unrecognised", () => {
+    // Fails closed: no roles means no area is entered, rather than defaulting
+    // into one.
+    expect(mergeRoles("root", [])).toEqual([]);
+    expect(mergeRoles(null, null)).toEqual([]);
+  });
+
+  it("keeps valid granted roles when the primary is unrecognised", () => {
+    expect(mergeRoles("root", [{ role: "faculty" }])).toEqual(["faculty"]);
+  });
+
+  it("handles the real two-role accounts", () => {
+    // The head of AIML is also an administrator; the administrator also
+    // teaches. Both land on /admin and can reach their second portal.
+    const head = mergeRoles("admin", [{ role: "admin" }, { role: "hod" }]);
+    expect(head).toHaveLength(2);
+    expect(head).toContain("admin");
+    expect(head).toContain("hod");
+
+    const teacher = mergeRoles("admin", [
+      { role: "admin" },
+      { role: "faculty" },
+    ]);
+    expect(teacher).toHaveLength(2);
+    expect(teacher).toContain("faculty");
   });
 });
 

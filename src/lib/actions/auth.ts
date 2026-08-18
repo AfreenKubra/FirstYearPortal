@@ -186,7 +186,19 @@ export async function login(
   // holding valid credentials for a portal they were just refused.
   const portal = formData.get("portal");
   if (typeof portal === "string" && portal.length > 0) {
-    if (!account || account.role !== portal) {
+    // Membership, not equality: the head of a department is also an
+    // administrator here, and `users.role` holds only their primary role.
+    const { data: granted } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user.id);
+
+    const held = new Set<string>([
+      ...(account ? [account.role] : []),
+      ...(granted ?? []).map((row) => row.role),
+    ]);
+
+    if (!held.has(portal)) {
       await supabase.auth.signOut();
       return {
         status: "error",
@@ -233,7 +245,12 @@ export async function login(
 
   revalidatePath("/", "layout");
 
-  redirect(homeForRole(account.role));
+  // Signing in through a role-specific entrance lands you in that role's
+  // area, not your primary one. Someone who deliberately opened /login/hod
+  // wants the department portal, even though their primary role sends them
+  // to /admin every other time.
+  const portalRole = typeof portal === "string" ? portal : null;
+  redirect(homeForRole(portalRole ?? account.role));
 }
 
 export async function logout() {
