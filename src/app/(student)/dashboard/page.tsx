@@ -46,11 +46,7 @@ function formatGreetingName(fullName: string, usn: string): string {
   if (!fullName || fullName.toUpperCase() === usn.toUpperCase()) {
     return "Student";
   }
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length > 1 && parts[0].length <= 2) {
-    return `${parts[0]} ${parts[1]}`;
-  }
-  return parts[0];
+  return fullName.trim();
 }
 
 export default async function DashboardPage() {
