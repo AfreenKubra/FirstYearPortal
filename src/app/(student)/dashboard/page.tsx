@@ -42,6 +42,17 @@ function nameById(options: Array<{ id: number; name: string }>, ids: number[]) {
   return ids.map((id) => lookup.get(id)).filter(Boolean) as string[];
 }
 
+function formatGreetingName(fullName: string, usn: string): string {
+  if (!fullName || fullName.toUpperCase() === usn.toUpperCase()) {
+    return "Student";
+  }
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length > 1 && parts[0].length <= 2) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0];
+}
+
 export default async function DashboardPage() {
   const student = await getOwnStudent();
   if (!student) redirect("/login");
@@ -68,7 +79,7 @@ export default async function DashboardPage() {
   const goals = nameById(lookups.goals, snapshot.goalIds);
   const domains = nameById(lookups.domains, snapshot.domainIds);
 
-  const firstName = student.fullName.split(" ")[0];
+  const greetingName = formatGreetingName(student.fullName, student.usn);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -77,7 +88,7 @@ export default async function DashboardPage() {
           {student.departmentName}
         </p>
         <h1 className="mt-1 text-2xl text-indigo-950 sm:text-3xl">
-          Welcome back, {firstName}
+          Welcome back, {greetingName}
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
           {student.usn} · Semester {academic?.semester ?? "—"} · Section{" "}
