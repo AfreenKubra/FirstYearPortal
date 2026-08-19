@@ -11,46 +11,62 @@ Last updated when PRD module 5.11 (notifications and reports) landed.
 
 ---
 
-## 1. Apply the outstanding migrations
+## 1. Migrations
 
-**Status: required. Nothing in modules 5.7–5.11 works until this is done.**
-
-Migrations `0013`–`0017` are written but not applied to the live database:
-
-| Migration | Adds |
-|---|---|
-| `0013_assessments.sql` | Assessment engine |
-| `0014_events.sql` | Events, registration, attendance |
-| `0015_resources.sql` | Resource catalogue |
-| `0016_roadmaps.sql` | Development roadmaps |
-| `0017_notifications.sql` | Notifications, and the realtime publication |
-
-Check what is missing at any time:
+**Status: done on the current database. All 17 are applied and recorded.**
 
 ```bash
-npm run check:schema
+npm run migrate:dry    # "All 17 migration(s) already applied."
+npm run check:schema   # probes the live catalog rather than the ledger
 ```
 
-Apply them either way:
+Adding a migration from here is one command: write the file, `npm run
+migrate`. Add a probe for it in `scripts/check-schema.mjs` at the same time —
+that script lists any migration it has no probe for, so an omission is
+visible rather than silently reported as fine.
+
+### Setting up a new environment
+
+`DATABASE_URL` must be in `.env.local` (gitignored). Get it from the
+dashboard's **Connect** button — not Project Settings, which no longer holds
+it — and choose **Session pooler**, port `5432`.
+
+Two traps, both of which cost time here:
+
+- **Direct connection does not work** from an IPv4-only network. Its host is
+  `db.<ref>.supabase.co` and it fails with `ENOTFOUND`. The pooler string is
+  the one whose *username* contains the project ref
+  (`postgres.<ref>`), which is the quickest way to tell them apart.
+- **The `[YOUR-PASSWORD]` placeholder is literal.** Replace it, brackets
+  included, with the database password — which is not the Supabase login, is
+  shown only once at project creation, and can be reset under Project
+  Settings → Database.
+
+### If migrations were applied by hand first
+
+The runner keeps its own ledger in `schema_migrations`. A database migrated
+through the SQL Editor has no ledger, so the runner considers every file
+pending and will fail trying to re-create objects that already exist.
 
 ```bash
-npm run migrate        # needs DATABASE_URL in .env.local
+npm run backfill:migrations -- --dry   # what it would record, and why
+npm run backfill:migrations
 ```
 
-or paste each file into the Supabase SQL Editor, one at a time, in order.
+It matches each migration to a signature object in the live catalog — a
+table, column, policy, enum value, or function body — and records only what
+it can actually confirm. Anything it cannot confirm is left for the runner.
 
-**Why this cannot be automated here:** applying a migration is DDL, and the
-Supabase client libraries do not execute DDL. It needs either a direct
-Postgres connection (`DATABASE_URL`, which carries the database password) or
-the dashboard. Neither is available to the tooling in this repository by
-design — a service-role key deliberately cannot restructure the schema.
+That is not a formality. On this database it correctly found that
+`0006_email_sync.sql` and `0008_approve_all_registrations.sql` had **never
+been applied**, which nobody had noticed: students were self-registering as
+`active` and skipping the approval queue entirely, contrary to what the PRD
+and README both said.
 
-To set up `npm run migrate` once and stop pasting:
-
-1. Supabase dashboard → **Project Settings** → **Database** → **Connection
-   string** → **URI**
-2. Replace `[YOUR-PASSWORD]` with the database password
-3. Add it to `.env.local` as `DATABASE_URL=…` (the file is gitignored)
+**Why applying migrations cannot be automated from the app's own tooling:**
+it is DDL, and the Supabase client libraries do not execute DDL. It needs a
+direct Postgres connection or the dashboard. A service-role key deliberately
+cannot restructure the schema.
 
 ---
 
@@ -136,6 +152,7 @@ These are not bugs. Features look empty until somebody puts something in.
 
 | What | Who does it | Where |
 |---|---|---|
+| **Approving new accounts** | An administrator | Admin → Account approvals |
 | **Faculty assignments** | An administrator | Admin → Faculty assignments |
 | **Resource catalogue** | Faculty or an administrator | Admin → Resources |
 | **Assessments** | Faculty or a HOD | Faculty → Assessments → New |
@@ -147,6 +164,14 @@ with no assignment rows sees an empty student directory and concludes the
 filters are broken. They are not: `can_faculty_view_student()` returns false
 for everyone until an assignment exists. Heads of department and
 administrators do not need one.
+
+**New student registrations now need approving.** Until
+`0008_approve_all_registrations.sql` was applied (2026-08-19) students
+self-registered as `active` and never appeared in the queue, despite the PRD
+and README saying otherwise. That is fixed, and the consequence is real
+workload: at the start of term every first-year student needs a decision,
+concentrated into a few days. The queue sorts oldest-first so it is worked in
+the order students joined. Existing accounts were not affected.
 
 The resource catalogue ships **empty on purpose**. PRD 5.9 forbids fabricated
 URLs and metadata, and a plausible-looking link nobody has opened is exactly

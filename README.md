@@ -337,6 +337,7 @@ has to complete their own profile before the dashboard unlocks.
 | `npm test` | Vitest unit tests |
 | `npm run migrate` | Apply pending database migrations |
 | `npm run check:schema` | Report which migrations the live database is missing |
+| `npm run backfill:migrations` | Record already-applied migrations, for a database migrated by hand |
 | `npm run sync:admins` | Reconcile who holds the `admin` role against the allow-list |
 | `npm run seed:students` | Bulk-create student accounts |
 
