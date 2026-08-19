@@ -16,7 +16,7 @@
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
@@ -126,6 +126,16 @@ const CHECKS = [
     label: "resource catalogue and recommendations",
     probe: () => tableExists("resources"),
   },
+  {
+    migration: "0016_roadmaps.sql",
+    label: "development roadmaps and mentor review",
+    probe: () => tableExists("student_roadmaps"),
+  },
+  {
+    migration: "0017_notifications.sql",
+    label: "notifications and realtime",
+    probe: () => tableExists("notifications"),
+  },
 ];
 
 console.log(`\nChecking ${url}\n`);
@@ -138,8 +148,39 @@ for (const check of CHECKS) {
   if (!ok) missing.push(check.migration);
 }
 
+/**
+ * Every migration file that has no probe above.
+ *
+ * This exists because the failure it catches has already happened twice: a
+ * migration was added, no probe was written for it, and this script cheerfully
+ * reported "Every migration is applied" while the tables were missing. A tool
+ * that silently under-reports is worse than no tool, because it is believed.
+ *
+ * Some files legitimately have no probe — a policy-only or data-only migration
+ * creates nothing to look for. Those are listed as unchecked rather than
+ * assumed present, so the gap stays visible.
+ */
+const migrationsDir = join(root, "supabase", "migrations");
+const probed = new Set(CHECKS.map((c) => c.migration));
+const unprobed = readdirSync(migrationsDir)
+  .filter((name) => name.endsWith(".sql") && !probed.has(name))
+  .sort();
+
+if (unprobed.length > 0) {
+  console.log("\nNot checked — no probe defined for these files:");
+  for (const name of unprobed) console.log(`  ?        ${name}`);
+  console.log(
+    "\nThey may or may not be applied. Add a probe in scripts/check-schema.mjs\n" +
+      "so this script can tell you.",
+  );
+}
+
 if (missing.length === 0) {
-  console.log("\nEvery migration is applied.\n");
+  console.log(
+    unprobed.length === 0
+      ? "\nEvery migration is applied.\n"
+      : `\nEvery migration with a probe is applied; ${unprobed.length} unchecked.\n`,
+  );
   process.exit(0);
 }
 
