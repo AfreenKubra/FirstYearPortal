@@ -104,13 +104,15 @@ function loadEnv() {
   }
 }
 
-const BOOLEAN_FLAGS = ["--dry", "--reset-passwords"];
+const BOOLEAN_FLAGS = ["--dry", "--reset-passwords", "--reset-only"];
 
 function parseArgs(argv) {
   const options = {
     ...DEFAULTS,
     dry: argv.includes("--dry"),
-    resetPasswords: argv.includes("--reset-passwords"),
+    resetPasswords: argv.includes("--reset-passwords") || argv.includes("--reset-only"),
+    // Rotate existing accounts without creating any that are missing.
+    resetOnly: argv.includes("--reset-only"),
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -213,8 +215,31 @@ async function main() {
   );
 
   if (options.dry) {
+    // Look each seat up rather than assuming. A dry run that reports "would
+    // create" for accounts that already exist is worse than no dry run: it
+    // describes an operation nobody is about to perform, and the difference
+    // between creating a student and resetting their password is exactly what
+    // someone runs this to check.
     for (const seat of seats) {
-      console.log(`  would create  ${seat.usn} (${seat.fullName})  ${seat.email}  ${seat.password}`);
+      const { data: existing } = await db
+        .from("students")
+        .select("id")
+        .or(`usn.eq.${seat.usn},email.eq.${seat.email}`)
+        .maybeSingle();
+
+      const action = existing
+        ? options.resetPasswords
+          ? "would reset  "
+          : "would skip   "
+        : options.resetOnly
+          ? "absent       "
+          : "would create ";
+
+      console.log(
+        ` ${action} ${seat.usn} (${seat.fullName})  ${seat.email}  ${
+          existing && !options.resetPasswords ? "(password unchanged)" : seat.password
+        }`,
+      );
     }
     console.log("\nDry run — nothing was changed.\n");
     return;
@@ -266,6 +291,16 @@ async function main() {
         console.log(`  reset   ${seat.usn}  ${seat.email}  ${seat.password}`);
         reset++;
       }
+      continue;
+    }
+
+    // A serial with no account is a gap in the cohort, not a missing seat —
+    // USNs are not always contiguous. `--reset-only` exists so rotating
+    // passwords across a range cannot quietly invent students for the numbers
+    // nobody was issued.
+    if (options.resetOnly) {
+      console.log(`  absent  ${seat.usn}  no account — not creating one`);
+      skipped++;
       continue;
     }
 
