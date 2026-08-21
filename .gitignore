@@ -44,3 +44,7 @@ Thumbs.db
 
 # Real student names — personal data, never committed
 students.local.json
+
+# Generated credential lists — names, emails, and passwords together
+student-credentials*.csv
+*.local.csv
