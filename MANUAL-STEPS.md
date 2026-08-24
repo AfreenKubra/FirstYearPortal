@@ -7,7 +7,8 @@ something deliberately left unbuilt with the reason recorded.
 Kept separate from `README.md` because that file describes the product as it
 stands; this one describes what is still owed.
 
-Last updated when PRD module 5.11 (notifications and reports) landed.
+Last updated 2026-08-19, after the five feature branches were merged into
+`main` and the seeded student passwords were rotated.
 
 ---
 
@@ -94,11 +95,16 @@ the USN, so a file containing name + USN is a file containing name + USN +
 password.
 
 If that combination ever reaches a public branch again, treat the seeded
-passwords as compromised and reset them:
+passwords as compromised and rotate them:
 
 ```bash
-npm run seed:students -- --reset-passwords
+npm run seed:students -- --reset-only --passwordSuffix '@SomethingNew'
 ```
+
+`--reset-only` rotates accounts that exist without creating any that do not.
+Use it rather than `--reset-passwords` for a rotation: USNs are not
+contiguous — `1HK24AI008` and `017` were never issued — and a plain range run
+would invent students for the numbers nobody was given.
 
 ---
 
@@ -126,23 +132,41 @@ exist regardless — and it works with nothing configured.
 
 ### 3.2 Seeded student passwords
 
-**Status: works, but is a handout scheme rather than a security one.**
+**Status: rotated on 2026-08-19. Still a handout scheme, not a security
+boundary.**
 
-Each seeded student's password is their own USN plus `@hkbk`
-(`1hk24ai001` → `1hk24ai001@hkbk`). Anyone who knows a registration number
-knows that student's password until they change it.
+The 28 seeded accounts (`1HK24AI001`–`030`, minus the two USNs never issued)
+now use `<usn>@Hkbk2026` — so `1hk24ai001@hkbk.edu.in` signs in with
+`1hk24ai001@Hkbk2026`. The previous scheme was `<usn>@hkbk`, which anyone
+could compute from a registration number printed on an ID card. Those old
+passwords no longer work; that was verified against three accounts after the
+rotation.
 
-That is a reasonable way to hand out fifty accounts on day one. It is not a
-reasonable steady state. Either tell students to change it at first sign-in,
-or change the suffix to something not derivable:
+The list lives in `student-credentials.local.csv` (gitignored) — USN, name,
+email, password.
 
-```bash
-npm run seed:students -- --passwordSuffix '@somethingElse'
-```
+**What this did and did not fix.** A stranger holding a USN can no longer
+derive the password. But every account shares one suffix, so anyone who
+learns *one* student's password can derive all 28. That is acceptable for
+credentials handed out on day one and expected to be changed; it is not
+acceptable as a steady state.
 
-Note the password also fails the portal's own strength rules (no uppercase),
-so a student resetting it will be asked for something stronger. That is
-intentional.
+Two ways to close it properly, in increasing order of effort:
+
+- Tell students to change their password at first sign-in, and check that
+  they have.
+- Issue an independent random password per student. The seeder does not do
+  this today — it is suffix-based by design — so it would need a small change
+  and a different distribution method, since nothing would be derivable.
+
+The password does satisfy the portal's own strength rules (lower, upper,
+digit, symbol), so a student is not forced to change it by the validator
+alone. Under the previous `@hkbk` suffix it failed the uppercase rule, which
+happened to force the issue; that accidental safeguard is gone.
+
+Two accounts are deliberately outside all of this and were never touched by
+the rotation: `1HK23AI048` and `1HK26AI001`, both real people who set their
+own passwords.
 
 ---
 
@@ -249,16 +273,48 @@ assessment results needs results to exist first.
 
 ---
 
-## 8. Merge order for the open pull requests
+## 8. The feature branches are merged — and were never reviewed
 
-Each branch is stacked on the one before it. Merging out of order will
-produce conflicts in the shared layout files.
+All five landed on `main` on 2026-08-19 as a single fast-forward, because the
+stack was linear:
 
-1. `assessment-engine`
-2. `events-module`
-3. `resources-module`
-4. `roadmap-module`
-5. `notifications-module`
+`assessment-engine` → `events-module` → `resources-module` →
+`roadmap-module` → `notifications-module`
 
-CodeRabbit reviews pull requests only, so merging a branch locally skips its
-review.
+**No pull request was ever opened for any of them, so CodeRabbit reviewed
+none of it.** CodeRabbit only reviews pull requests; a local merge skips it
+entirely. That is roughly 5,000 lines — the assessment engine, events,
+resources, roadmaps, and notifications — carrying seventeen RLS policies and
+eleven database triggers, none of which a second pair of eyes has seen.
+
+The branches still exist on the remote, so any of them can be opened as a
+pull request against a scratch branch later if you want the review
+retrospectively.
+
+From here, put changes on a branch and open a PR rather than merging locally,
+or that gap keeps widening.
+
+---
+
+## 9. Deployment
+
+Not deployed yet. When it goes to Vercel:
+
+- Set exactly three environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **Do not set `DATABASE_URL`.** It appears only in `scripts/`, never in
+  `src/`, and it carries the database password. The running app has no use
+  for it.
+- Update **Supabase → Authentication → URL Configuration**: Site URL to the
+  Vercel domain, and add `https://<app>.vercel.app/**` to Redirect URLs.
+  Keep `http://localhost:3000/**` so local development still works. Skip this
+  and password reset silently sends people to localhost.
+
+`SUPABASE_SERVICE_ROLE_KEY` is read in exactly one file,
+`src/lib/supabase/server.ts`, which is not a client component — so it does
+not reach the browser bundle. Worth re-checking if that file is ever split.
+
+Deploying makes real student data reachable from the public internet: names,
+marks, and guardian phone numbers for 30 first-years. Decide deliberately
+whether this deployment should point at the production Supabase project or a
+separate one holding demo data.
