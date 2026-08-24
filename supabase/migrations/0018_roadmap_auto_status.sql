@@ -1,0 +1,23 @@
+-- ===========================================================================
+-- 0018_roadmap_auto_status.sql — add the 'auto' roadmap status
+--
+-- Alone in its own file, for the same reason 0010 was: PostgreSQL will not
+-- let one transaction add an enum value and then use it. 0019 uses it.
+--
+-- 'auto' means: generated from the student's current profile and visible to
+-- them straight away, without a mentor having read it.
+--
+-- This is a deliberate reversal of the rule 0016 established, made by the
+-- product owner. It is worth being precise about what changed rather than
+-- quietly widening 'approved':
+--
+--   auto     — the portal wrote this, nobody has checked it
+--   approved — a mentor has read it and endorsed it
+--
+-- Both are visible to the student. Keeping them distinct is what lets the
+-- interface say which one a student is looking at; folding auto-generated
+-- plans into 'approved' would have made the word mean nothing and left no way
+-- to tell an endorsed plan from an unread one.
+-- ===========================================================================
+
+alter type public.roadmap_status add value if not exists 'auto' before 'approved';

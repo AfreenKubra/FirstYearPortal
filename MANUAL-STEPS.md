@@ -14,10 +14,10 @@ Last updated 2026-08-19, after the five feature branches were merged into
 
 ## 1. Migrations
 
-**Status: done on the current database. All 17 are applied and recorded.**
+**Status: done on the current database. All 20 are applied and recorded.**
 
 ```bash
-npm run migrate:dry    # "All 17 migration(s) already applied."
+npm run migrate:dry     # "All 20 migration(s) already applied."
 npm run check:schema   # probes the live catalog rather than the ledger
 ```
 
@@ -170,6 +170,34 @@ own passwords.
 
 ---
 
+## 3.3 The mentor-review gate was removed
+
+**Status: decided 2026-08-19. Recorded here because it reversed a stated
+product guarantee.**
+
+Roadmaps now regenerate whenever a student changes their profile and are
+visible to them immediately. Previously migration 0016 made an unreviewed
+plan invisible in RLS, and PRD section 2 promised "a roadmap a human mentor
+has reviewed".
+
+What replaced it:
+
+- `auto` — the portal generated this from the student's profile and nobody
+  has read it. This is what a student normally sees.
+- `approved` — a mentor has read it and endorsed it.
+
+Both are visible; the interface says which. Mentor review still exists as a
+queue, it is simply no longer a gate.
+
+**What still protects the student.** The generator invents nothing — no
+course names, no certifications, no URLs, no salary or placement figures, and
+no syllabus content beyond what an administrator entered from the official
+VTU scheme. There are tests asserting the absence of each. That is now the
+only safeguard between the generator and the student, so it matters more than
+it did.
+
+---
+
 ## 4. Data the portal is waiting for
 
 These are not bugs. Features look empty until somebody puts something in.
@@ -181,7 +209,8 @@ These are not bugs. Features look empty until somebody puts something in.
 | **Resource catalogue** | Faculty or an administrator | Admin → Resources |
 | **Assessments** | Faculty or a HOD | Faculty → Assessments → New |
 | **Events** | Faculty or a HOD | Faculty → Events → New |
-| **Roadmaps** | A mentor, per student | A student's profile → Generate |
+| **Roadmaps** | Nobody — they generate themselves | Student → My roadmap |
+| **VTU scheme subjects** | An administrator | Admin → VTU scheme |
 
 **Faculty assignments are the one that catches people out.** A faculty member
 with no assignment rows sees an empty student directory and concludes the
@@ -196,6 +225,14 @@ and README saying otherwise. That is fixed, and the consequence is real
 workload: at the start of term every first-year student needs a decision,
 concentrated into a few days. The queue sorts oldest-first so it is worked in
 the order students joined. Existing accounts were not affected.
+
+**The VTU scheme starts empty, and roadmaps stay quiet about the syllabus
+until it is filled.** The portal does not read vtu.ac.in — an explicit
+non-goal — and the generator will not invent a subject name. Until an
+administrator enters the scheme for a department and semester, plans for
+those students simply say nothing about their subjects. That is the honest
+output, not a bug. Entering one semester for one department takes a few
+minutes and improves every plan in it from the students' next page view.
 
 The resource catalogue ships **empty on purpose**. PRD 5.9 forbids fabricated
 URLs and metadata, and a plausible-looking link nobody has opened is exactly
