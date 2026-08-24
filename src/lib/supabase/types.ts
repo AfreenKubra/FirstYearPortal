@@ -301,6 +301,48 @@ export type Database = {
         Update: Partial<{ read_at: string | null }>;
         Relationships: [];
       };
+      vtu_subjects: {
+        Row: {
+          id: string;
+          department_code: string;
+          semester: number;
+          code: string;
+          name: string;
+          credits: number | null;
+          scheme_year: number;
+          official_url: string;
+          notes: string | null;
+          added_by: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          department_code: string;
+          semester: number;
+          code: string;
+          name: string;
+          credits?: number | null;
+          scheme_year: number;
+          official_url: string;
+          notes?: string | null;
+          added_by?: string | null;
+        };
+        Update: Partial<{
+          name: string;
+          credits: number | null;
+          official_url: string;
+          notes: string | null;
+          is_active: boolean;
+        }>;
+        Relationships: [];
+      };
+      vtu_subject_domains: {
+        Row: { subject_id: string; domain_id: number };
+        Insert: { subject_id: string; domain_id: number };
+        Update: never;
+        Relationships: [];
+      };
       student_roadmaps: {
         Row: {
           id: string;
@@ -309,6 +351,7 @@ export type Database = {
           provider: string | null;
           model: string | null;
           inputs_summary: string | null;
+          inputs_fingerprint: string | null;
           approval_status: RoadmapStatus;
           reviewed_by: string | null;
           reviewed_at: string | null;
@@ -322,6 +365,7 @@ export type Database = {
           provider?: string | null;
           model?: string | null;
           inputs_summary?: string | null;
+          inputs_fingerprint?: string | null;
           approval_status?: RoadmapStatus;
         };
         Update: Partial<{
@@ -887,6 +931,15 @@ export type Database = {
       current_user_role: { Args: Record<string, never>; Returns: UserRole };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_hod: { Args: Record<string, never>; Returns: boolean };
+      department_roadmap_stats: {
+        Args: { p_department: string };
+        Returns: Array<{
+          cohort_size: number | null;
+          avg_completion: number | null;
+          avg_milestones: number | null;
+          students_with_plan: number | null;
+        }>;
+      };
       has_role: { Args: { p_role: UserRole }; Returns: boolean };
       current_roles: { Args: Record<string, never>; Returns: UserRole[] };
       current_hod_department: {

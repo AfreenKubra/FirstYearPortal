@@ -25,6 +25,7 @@ function navItems(
       label: "Resources",
       badge: uncheckedResources,
     },
+    { href: "/admin/vtu", label: "VTU scheme" },
     { href: "/admin/reports", label: "Reports" },
     { href: "/admin/audit", label: "Audit log" },
     { href: "/notifications", label: "Notifications" },

@@ -64,6 +64,13 @@ async function columnExists(table, column) {
   return !error;
 }
 
+/** True when a function of that name exists in public. */
+async function functionExists(name) {
+  const { error } = await db.rpc(name);
+  // A missing function is PGRST202; anything else means it is there.
+  return !error || error.code !== "PGRST202";
+}
+
 /** True when the enum accepts the value — probed through a function call. */
 async function roleEnumHasHod() {
   const { error } = await db.from("users").select("id").eq("role", "hod").limit(1);
@@ -135,6 +142,31 @@ const CHECKS = [
     migration: "0017_notifications.sql",
     label: "notifications and realtime",
     probe: () => tableExists("notifications"),
+  },
+  {
+    migration: "0018_roadmap_auto_status.sql",
+    label: "'auto' value on roadmap_status",
+    probe: async () => {
+      // Filtering on an enum value Postgres does not know is an error, so a
+      // clean query is proof the value exists — the same trick the 'hod'
+      // probe uses.
+      const { error } = await db
+        .from("student_roadmaps")
+        .select("id")
+        .eq("approval_status", "auto")
+        .limit(1);
+      return !error;
+    },
+  },
+  {
+    migration: "0019_vtu_scheme_and_live_roadmaps.sql",
+    label: "VTU scheme and live roadmaps",
+    probe: () => tableExists("vtu_subjects"),
+  },
+  {
+    migration: "0020_trusted_server_writes.sql",
+    label: "service-role exemption on the write guards",
+    probe: () => functionExists("is_trusted_server"),
   },
 ];
 

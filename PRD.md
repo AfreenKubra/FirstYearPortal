@@ -35,8 +35,17 @@ This portal exists to:
   using filters, not manual searching.
 - Admins can see department-wise and institution-wide analytics without
   exporting data to another tool.
-- Every student receives a roadmap that a human mentor has reviewed, not an
-  unreviewed AI output.
+- Every student has a roadmap that is current with their profile, and that
+  can say which of their own inputs produced each recommendation.
+  *(Changed 2026-08-19. This previously read "a roadmap that a human mentor
+  has reviewed, not an unreviewed AI output", and migration 0016 enforced it
+  in RLS. The institution chose immediacy instead: plans now regenerate on
+  profile change and are visible at once. Mentor endorsement survives as an
+  additional state — `auto` means the portal wrote it and nobody has checked
+  it, `approved` means a mentor has — and the interface says which one a
+  student is looking at. The safeguard that remains is that the generator
+  invents nothing: no course names, no URLs, no syllabus content beyond what
+  an administrator entered from the official scheme.)*
 - All of the above works within strict, auditable role boundaries — a
   student can never see another student's data; a faculty member can never
   see students outside their assignment; only admins see everything.
@@ -244,7 +253,7 @@ started** (spec'd in the original brief, no design work done yet).
 - **Planned:** matching on assessment performance, which needs results to
   exist first; and bulk import for the VTU scheme documents.
 
-### 5.10 Individual development roadmap — *Partial*
+### 5.10 Individual development roadmap — *Partial (live regeneration shipped; AI generation not built)*
 - Generated from the student's profile + assessment results; explainable
   (shows which inputs drove each recommendation), editable, regenerable.
 - Milestones at 30 days / 3–6 months / 1–4 years; progress tracking.
@@ -317,7 +326,7 @@ started** (spec'd in the original brief, no design work done yet).
 | 2. Foundation | Auth, RBAC, schema, branding, registration, mandatory profile gate | **Done** |
 | 3. Dashboards & analytics | Faculty, HOD, and admin dashboards, filters, charts, student detail, CSV export | **Done** |
 | 4. Extended modules | Achievements **done**; assessments, events, resources, recommendations, AI roadmap, notifications **not started** | **Partial** |
-| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — 222 unit tests, typecheck, lint, and production build all pass; no integration/e2e tests yet |
+| 5. Verification | Full test suite, security/accessibility review, production build | **Partial** — 239 unit tests, typecheck, lint, and production build all pass; no integration/e2e tests yet |
 
 ## 9. Open questions for stakeholders
 
