@@ -46,6 +46,17 @@ export type RoadmapInput = {
   twelfthPercentage: number | null;
   /** Achievements already recorded and verified, if any. */
   verifiedAchievements: number;
+  /**
+   * VTU subjects for this student's department and semester, exactly as an
+   * administrator entered them from the official scheme.
+   *
+   * Names only, and optional. The generator cites what a person typed and can
+   * be held to; it never invents a subject code, and says nothing at all
+   * about the syllabus when this is empty.
+   */
+  vtuSubjects?: string[];
+  /** The official scheme page those subjects came from, if recorded. */
+  vtuSchemeUrl?: string | null;
 };
 
 export type GeneratedRoadmap = {
@@ -311,6 +322,34 @@ export function generateRoadmap(input: RoadmapInput): GeneratedRoadmap {
     rationale: `You are in ${input.departmentName}.`,
   });
 
+  // Syllabus-anchored milestones, only when an administrator has actually
+  // entered the scheme. With no subjects on file the generator says nothing
+  // about the syllabus at all rather than guessing at one — the same rule
+  // that keeps the resource catalogue honest.
+  const subjects = input.vtuSubjects ?? [];
+  if (subjects.length > 0) {
+    const named = subjects.slice(0, 3).join(", ");
+    milestones.push({
+      horizon: "thirty_days",
+      title: `Map this semester's subjects to what you want to do`,
+      detail:
+        `Your scheme this semester includes ${named}` +
+        (subjects.length > 3 ? `, among others.` : ".") +
+        " Work out which of them feed the direction you have chosen — that is what makes them worth more than a pass mark.",
+      rationale: `Taken from the VTU scheme recorded for ${input.departmentName}${
+        input.semester ? `, semester ${input.semester}` : ""
+      }.`,
+    });
+
+    milestones.push({
+      horizon: "three_to_six_months",
+      title: "Go one level deeper than the syllabus in a subject you like",
+      detail:
+        "Pick the single subject you find most interesting and read beyond what is examinable. Depth in one place is worth more than an even spread.",
+      rationale: `You are studying ${subjects.length} subjects this semester under the recorded VTU scheme.`,
+    });
+  }
+
   // A student arriving with weaker school marks is the one most likely to
   // quietly fall behind in the first year, and the least likely to ask. This
   // is phrased as support rather than a verdict — a percentage is not a
@@ -420,6 +459,9 @@ export function describeInputs(input: RoadmapInput): string {
       ? `12th: ${input.twelfthPercentage}%`
       : null,
     `Verified achievements: ${input.verifiedAchievements}`,
+    (input.vtuSubjects ?? []).length > 0
+      ? `VTU scheme subjects on file: ${(input.vtuSubjects ?? []).length}`
+      : "VTU scheme: none recorded for this department and semester",
   ].filter(Boolean);
 
   return parts.join(" · ");

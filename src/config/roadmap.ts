@@ -7,6 +7,7 @@ export type RoadmapSource = "rule_based" | "ai";
 
 export type RoadmapStatus =
   | "draft"
+  | "auto"
   | "pending_mentor_review"
   | "approved"
   | "rejected"
@@ -14,6 +15,7 @@ export type RoadmapStatus =
 
 export const ROADMAP_STATUS_LABELS: Record<RoadmapStatus, string> = {
   draft: "Draft",
+  auto: "Generated from your profile",
   pending_mentor_review: "Waiting for review",
   approved: "Approved",
   rejected: "Sent back",
