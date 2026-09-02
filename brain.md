@@ -53,6 +53,7 @@ src/lib/resources/    bulk import, coverage, filters, recommendation matching
 src/lib/roadmap/      generate.ts (rule-based), ai-generate.ts (Claude-backed), ai-schema.ts,
                        exam-track.ts, fingerprint.ts, link-providers.ts, links.ts, provider.ts, refresh.ts
 src/lib/directory/    CSV export builder (provenance header, CSV-injection escaping)
+src/lib/auth/         rate-limit.ts — DB-backed limiter for login/reset/register (0029)
 src/lib/marks/        compute.ts — pure: sumRecorded, releasedOnly, pivotToComponents, validateMark
                        export.ts  — marks CSV builder (one row per student per subject)
 src/lib/profile-completion.ts   pure fn: computes profile_completion_percent
@@ -62,7 +63,7 @@ src/config/            roles.ts, branding.ts, residence.ts, states.ts, achieveme
                        marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0028, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0029, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```
@@ -154,11 +155,11 @@ check; `npm run build` before anything deploy-adjacent.
 
 ## Current known gaps (see MANUAL-STEPS.md for full detail/why)
 
-- RLS is now covered for marks/subject_faculty/notifications by
-  `npm run test:rls` (`tests/rls/`, own vitest config, real DB, fixtures
-  created and torn down per run). **Every other table's policies are still
-  unverified** — achievements, events, assessments, resources, roadmaps.
-  Still no integration or e2e tests.
+- RLS is covered by `npm run test:rls` (36 specs, `tests/rls/`, own vitest
+  config, real DB, fixtures torn down per run): marks, subject_faculty,
+  notifications, students, achievements, audit log, admin allow-list, and the
+  rate limiter. **Still unverified** — events, assessment attempts/answers,
+  resources, roadmaps. No integration or e2e tests at all.
 - Internal marks editing is restricted to the assigned subject teacher, the
   HOD of that department, and admins (migration 0026, `subject_faculty`).
   A subject with **no** teacher assigned falls back to HOD/admin only — a
@@ -187,8 +188,13 @@ check; `npm run build` before anything deploy-adjacent.
   merged locally on 2026-08-19 without ever going through a PR/CodeRabbit
   review — ~5,000 lines, 17 RLS policies, 11 triggers, unreviewed. From here,
   branch + PR, don't merge locally.
-- Auth endpoints have no rate limiting yet. Email verification enforcement
-  is off (required for registration's current session-based flow to work).
+- Auth endpoints are rate limited (migration 0029, `lib/auth/rate-limit.ts`):
+  login, password reset, and registration, keyed on both the email typed and
+  the source IP, DB-backed because an in-memory counter is meaningless on
+  serverless. **Email verification enforcement is still off** — registration
+  writes the student row using the session `signUp` returns, so turning on
+  Supabase's "Confirm email" breaks it until that flow is reworked. That is
+  the last thing genuinely blocking real students.
 - Not deployed yet.
 
 ## Tests-as-spec

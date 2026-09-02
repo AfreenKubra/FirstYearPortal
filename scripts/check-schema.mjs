@@ -193,6 +193,21 @@ const CHECKS = [
       return !error;
     },
   },
+  {
+    migration: "0029_auth_rate_limits.sql",
+    label: "rate limiting on the authentication endpoints",
+    probe: async () => {
+      // The table is deliberately unreadable even to the service role's
+      // PostgREST view (RLS on, no policies), so probe the function instead —
+      // this one IS callable, unlike a trigger function.
+      const { error } = await db.rpc("consume_rate_limit", {
+        p_bucket: "schema-probe",
+        p_limit: 1000000,
+        p_window_seconds: 1,
+      });
+      return !error || error.code !== "PGRST202";
+    },
+  },
   // 0028_marks_released_notification.sql has no probe on purpose. It creates
   // only a trigger and its function, and PostgREST does not expose trigger
   // functions in its schema cache — `functionExists` returns PGRST202 for one

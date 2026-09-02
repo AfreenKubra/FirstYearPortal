@@ -344,6 +344,19 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      auth_rate_limits: {
+        Row: {
+          bucket: string;
+          window_start: string;
+          attempts: number;
+          updated_at: string;
+        };
+        // Written only through `consume_rate_limit`, never directly — the
+        // table has RLS on with no policies at all (migration 0029).
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       subject_faculty: {
         Row: {
           subject_id: string;
@@ -1099,6 +1112,16 @@ export type Database = {
         Args: Record<string, never>;
         Returns: string[];
       };
+      consume_rate_limit: {
+        Args: {
+          p_bucket: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
+      clear_rate_limit: { Args: { p_bucket: string }; Returns: undefined };
+      prune_rate_limits: { Args: Record<string, never>; Returns: number };
     };
     Enums: {
       user_role: UserRole;
