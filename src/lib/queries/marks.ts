@@ -181,16 +181,33 @@ export async function getMarksGrid(
   };
 }
 
-/** Subjects a member of staff may mark against, for the picker. */
+/**
+ * Subjects the caller may actually mark, for the picker (migration 0026).
+ *
+ * Narrowed by `my_markable_subject_ids()` — the subject teacher's own
+ * subjects, or every subject in the department for a HOD or administrator.
+ * Offering a subject the caller cannot save would produce a grid that
+ * refuses every write with nothing on screen explaining why.
+ *
+ * A database that has not had 0026 applied returns no ids and therefore no
+ * subjects, which is the wrong answer in the safe direction: the screen says
+ * nothing is assigned rather than silently letting anyone mark anything.
+ */
 export async function listMarkableSubjects(departmentCode: string): Promise<
   Array<{ id: string; code: string; name: string; semester: number }>
 > {
   const supabase = createClient();
+
+  const { data: allowed } = await supabase.rpc("my_markable_subject_ids");
+  const allowedIds = (allowed ?? []) as string[];
+  if (allowedIds.length === 0) return [];
+
   const { data } = await supabase
     .from("vtu_subjects")
     .select("id, code, name, semester, scheme_year")
     .eq("department_code", departmentCode)
     .eq("is_active", true)
+    .in("id", allowedIds)
     .order("semester")
     .order("scheme_year", { ascending: false })
     .order("code")
@@ -206,6 +223,120 @@ export async function listMarkableSubjects(departmentCode: string): Promise<
     code: row.code,
     name: row.name,
     semester: row.semester,
+  }));
+}
+
+// --- Who teaches what (migration 0026) --------------------------------------
+
+export type SubjectAssignment = {
+  subjectId: string;
+  subjectCode: string;
+  subjectName: string;
+  departmentCode: string;
+  semester: number;
+  facultyId: string;
+  facultyName: string;
+  facultyEmail: string;
+  /** Null means every section. */
+  section: string | null;
+};
+
+/**
+ * Every teaching assignment on file, for the admin screen.
+ *
+ * Three queries rather than embedded joins, for the `Relationships: []`
+ * reason documented in `supabase/types.ts`. The row counts here are one per
+ * subject-teacher pair, so this stays small.
+ */
+export async function listSubjectAssignments(): Promise<SubjectAssignment[]> {
+  const supabase = createClient();
+
+  const { data: links } = await supabase
+    .from("subject_faculty")
+    .select("subject_id, faculty_id, section")
+    .limit(1000);
+
+  const rows = (links ?? []) as Array<{
+    subject_id: string;
+    faculty_id: string;
+    section: string | null;
+  }>;
+  if (rows.length === 0) return [];
+
+  const [{ data: subjects }, { data: staff }] = await Promise.all([
+    supabase
+      .from("vtu_subjects")
+      .select("id, code, name, department_code, semester")
+      .in("id", [...new Set(rows.map((r) => r.subject_id))]),
+    supabase
+      .from("faculty")
+      .select("id, full_name, email")
+      .in("id", [...new Set(rows.map((r) => r.faculty_id))]),
+  ]);
+
+  const subjectById = new Map(
+    ((subjects ?? []) as Array<{
+      id: string;
+      code: string;
+      name: string;
+      department_code: string;
+      semester: number;
+    }>).map((row) => [row.id, row]),
+  );
+  const staffById = new Map(
+    ((staff ?? []) as Array<{ id: string; full_name: string; email: string }>).map(
+      (row) => [row.id, row],
+    ),
+  );
+
+  return rows
+    .map((row) => {
+      const subject = subjectById.get(row.subject_id);
+      const person = staffById.get(row.faculty_id);
+      if (!subject || !person) return null;
+      return {
+        subjectId: row.subject_id,
+        subjectCode: subject.code,
+        subjectName: subject.name,
+        departmentCode: subject.department_code,
+        semester: subject.semester,
+        facultyId: row.faculty_id,
+        facultyName: person.full_name,
+        facultyEmail: person.email,
+        section: row.section,
+      };
+    })
+    .filter((row): row is SubjectAssignment => row !== null)
+    .sort(
+      (a, b) =>
+        a.departmentCode.localeCompare(b.departmentCode) ||
+        a.semester - b.semester ||
+        a.subjectCode.localeCompare(b.subjectCode) ||
+        a.facultyName.localeCompare(b.facultyName),
+    );
+}
+
+/** Active staff who can be assigned to teach, for the picker. */
+export async function listAssignableFaculty(): Promise<
+  Array<{ id: string; fullName: string; email: string; departmentCode: string }>
+> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("faculty")
+    .select("id, full_name, email, department_code")
+    .order("full_name")
+    .limit(500);
+
+  return ((data ?? []) as Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    department_code: string;
+  }>).map((row) => ({
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    departmentCode: row.department_code,
   }));
 }
 

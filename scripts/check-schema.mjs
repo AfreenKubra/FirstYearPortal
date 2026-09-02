@@ -173,6 +173,11 @@ const CHECKS = [
     label: "internal marks (IA, assignment, activity)",
     probe: () => tableExists("student_subject_marks"),
   },
+  {
+    migration: "0026_subject_faculty.sql",
+    label: "subject teachers, and marks restricted to them",
+    probe: () => tableExists("subject_faculty"),
+  },
 ];
 
 console.log(`\nChecking ${url}\n`);

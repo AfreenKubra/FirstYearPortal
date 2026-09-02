@@ -344,6 +344,23 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      subject_faculty: {
+        Row: {
+          subject_id: string;
+          faculty_id: string;
+          section: string | null;
+          assigned_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          subject_id: string;
+          faculty_id: string;
+          section?: string | null;
+          assigned_by?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
       mark_components: {
         Row: {
           code: string;
@@ -1073,6 +1090,14 @@ export type Database = {
       is_assigned_mentor: {
         Args: { p_student_id: string };
         Returns: boolean;
+      };
+      can_edit_subject_marks: {
+        Args: { p_subject_id: string; p_student_id: string };
+        Returns: boolean;
+      };
+      my_markable_subject_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
       };
     };
     Enums: {

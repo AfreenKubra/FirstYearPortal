@@ -16,9 +16,12 @@ migration pattern, a rule that no longer holds) — it decays otherwise.
 Next.js 14 (App Router) + Supabase (Postgres/Auth/RLS) portal for HKBK
 College of Engineering. Four roles — student, faculty, hod, admin — each with
 their own route group and dashboard, sharing one student-directory
-implementation underneath. TypeScript, Tailwind, Zod, Vitest. No Git repo
-detected at the working directory root (git commands won't apply here unless
-one exists deeper/elsewhere).
+implementation underneath. TypeScript, Tailwind, Zod, Vitest.
+
+Git: `origin` is the fork `s7oaib/FirstYearPortal`, `upstream` is
+`AfreenKubra/FirstYearPortal`. Work on a branch and open a PR — merging
+locally skips CodeRabbit, which is how ~5,000 lines already went unreviewed
+(see MANUAL-STEPS §8).
 
 ## Where things live
 
@@ -57,7 +60,7 @@ src/config/            roles.ts, branding.ts, residence.ts, states.ts, achieveme
                        marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0025, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0026, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```
@@ -85,7 +88,11 @@ a top-level `tests/` tree). Run all of them with `npm test`.
 5. **All staff visibility resolves through one function**,
    `can_faculty_view_student()` (Postgres). Adding a new staff-visible table
    or a new role variant should extend that function, not write a parallel
-   policy.
+   policy. It has three branches now: HOD department, mentor assignment, and
+   subject teacher (0026). Only the first two satisfy `p_mentor_only`, which
+   is what keeps guardian contact masked from a subject teacher.
+   **Editing marks is a separate question** — `can_edit_subject_marks()` —
+   because a mentor may see a card they must not change.
 6. **`components/directory/` + `lib/queries/directory.ts` is ONE
    implementation** shared by faculty/hod/admin. It takes no role/faculty-id/
    department param — scoping is 100% via RLS. Don't fork it per role; if a
@@ -140,10 +147,12 @@ check; `npm run build` before anything deploy-adjacent.
 
 - No integration/RLS/e2e tests — only unit tests (pure logic, validation,
   filters, grading, CSV escaping, marks arithmetic).
-- **Internal marks has no subject-teacher table.** Any staff member who can
-  see a student can edit that student's marks for any subject; `entered_by`
-  (pinned by trigger) plus `audit_logs` is the whole accountability story. A
-  `subject_faculty` assignment table is the natural follow-up.
+- Internal marks editing is restricted to the assigned subject teacher, the
+  HOD of that department, and admins (migration 0026, `subject_faculty`).
+  A subject with **no** teacher assigned falls back to HOD/admin only — a
+  deliberate fallback so nothing is ever uneditable, but it means the marks
+  subject picker is empty for a plain faculty member until an admin or HOD
+  assigns them under **Admin → VTU scheme → Who teaches what**.
 - **`vtu_subjects` is empty on the live DB**, so `/faculty/marks` and
   `/hod/marks` show "No subjects on file" until an admin enters the scheme
   under Admin → VTU scheme. Not a bug — same deliberate empty-start as the

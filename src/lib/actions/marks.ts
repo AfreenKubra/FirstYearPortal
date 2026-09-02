@@ -165,7 +165,7 @@ export async function saveMarks(
       return {
         status: "error",
         message:
-          "Could not save these marks. You may not have access to some of these students.",
+          "Could not save these marks. Since migration 0026 only the assigned subject teacher, the head of department, and administrators may edit marks — check you are down to teach this subject.",
       };
     }
   }
@@ -257,5 +257,119 @@ export async function releaseComponent(
     message: withdraw
       ? "Withdrawn. Students can no longer see that component."
       : "Released. Students can now see that component.",
+  };
+}
+
+// --- Who teaches what (migration 0026) --------------------------------------
+
+/**
+ * Assigns a member of staff to teach a subject.
+ *
+ * Administrator or the head of that subject's department only, enforced in
+ * RLS; the check here exists to produce a sentence rather than a silent
+ * zero-row write. A blank section means every section, matching the NULL
+ * convention `faculty_student_assignments` already uses.
+ */
+export async function assignSubjectTeacher(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const staff = await getOwnStaff();
+  if (!staff) {
+    return { status: "error", message: "Staff access required." };
+  }
+
+  const subjectId = String(formData.get("subjectId") ?? "");
+  const facultyId = String(formData.get("facultyId") ?? "");
+  const rawSection = String(formData.get("section") ?? "").trim();
+  const section = rawSection === "" ? null : rawSection.toUpperCase();
+
+  if (!subjectId || !facultyId) {
+    return { status: "error", message: "Choose a subject and a teacher." };
+  }
+  if (section !== null && section.length > 4) {
+    return { status: "error", message: "Section is at most 4 characters." };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.from("subject_faculty").insert({
+    subject_id: subjectId,
+    faculty_id: facultyId,
+    section,
+    assigned_by: await currentUserId(),
+  });
+
+  if (error) {
+    const message = /duplicate key|unique/i.test(error.message)
+      ? "That teacher is already assigned to this subject for that section."
+      : "Could not assign that teacher. Only an administrator or the head of the subject's department may do this.";
+    return { status: "error", message };
+  }
+
+  await writeAudit(await currentUserId(), "marks.assign_teacher", subjectId, {
+    faculty_id: facultyId,
+    section,
+    assigned_by_faculty: staff.id,
+  });
+
+  revalidatePath("/admin/vtu");
+  return {
+    status: "success",
+    message: section
+      ? `Assigned for section ${section}. They can now mark this subject.`
+      : "Assigned for all sections. They can now mark this subject.",
+  };
+}
+
+/** Removes a teaching assignment. Marks already recorded are left alone. */
+export async function removeSubjectTeacher(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const staff = await getOwnStaff();
+  if (!staff) {
+    return { status: "error", message: "Staff access required." };
+  }
+
+  const subjectId = String(formData.get("subjectId") ?? "");
+  const facultyId = String(formData.get("facultyId") ?? "");
+  const rawSection = String(formData.get("section") ?? "").trim();
+  const section = rawSection === "" ? null : rawSection;
+
+  if (!subjectId || !facultyId) {
+    return { status: "error", message: "Unknown assignment." };
+  }
+
+  const supabase = createClient();
+  let query = supabase
+    .from("subject_faculty")
+    .delete()
+    .eq("subject_id", subjectId)
+    .eq("faculty_id", facultyId);
+
+  // `.is` and `.eq` are different operators for NULL, and a section-scoped
+  // row must not be removed by a request meaning the all-sections one.
+  query = section === null ? query.is("section", null) : query.eq("section", section);
+
+  const { error } = await query;
+
+  if (error) {
+    return {
+      status: "error",
+      message: "Could not remove that assignment.",
+    };
+  }
+
+  await writeAudit(await currentUserId(), "marks.remove_teacher", subjectId, {
+    faculty_id: facultyId,
+    section,
+    removed_by_faculty: staff.id,
+  });
+
+  revalidatePath("/admin/vtu");
+  return {
+    status: "success",
+    message:
+      "Removed. Any marks they already entered are unchanged; they can no longer edit them.",
   };
 }

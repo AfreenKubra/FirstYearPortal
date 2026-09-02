@@ -5,9 +5,14 @@ import {
   RetireSubjectButton,
   VtuSubjectForm,
 } from "@/components/vtu/VtuSubjectForm";
+import { SubjectTeacherForm } from "@/components/marks/SubjectTeacherForm";
 import { getOwnAdmin } from "@/lib/queries/admin";
 import { listVtuSubjects } from "@/lib/queries/vtu";
 import { getLookups } from "@/lib/queries/student";
+import {
+  listAssignableFaculty,
+  listSubjectAssignments,
+} from "@/lib/queries/marks";
 
 export const metadata: Metadata = { title: "VTU scheme" };
 
@@ -15,9 +20,11 @@ export default async function AdminVtuPage() {
   const admin = await getOwnAdmin();
   if (!admin) redirect("/account-blocked?reason=no-staff-record");
 
-  const [subjects, lookups] = await Promise.all([
+  const [subjects, lookups, assignments, faculty] = await Promise.all([
     listVtuSubjects(),
     getLookups(),
+    listSubjectAssignments(),
+    listAssignableFaculty(),
   ]);
 
   const active = subjects.filter((s) => s.isActive);
@@ -152,6 +159,20 @@ export default async function AdminVtuPage() {
           <VtuSubjectForm
             departments={lookups.departments}
             domains={lookups.domains}
+          />
+        </CardBody>
+      </Card>
+
+      <Card as="section">
+        <CardHeader
+          title="Who teaches what"
+          description="Only the assigned teacher can edit a subject's internal marks, alongside the head of that department and administrators. A subject with nobody assigned can still be marked by its head of department — it is a fallback, not a lockout."
+        />
+        <CardBody>
+          <SubjectTeacherForm
+            subjects={subjects}
+            faculty={faculty}
+            assignments={assignments}
           />
         </CardBody>
       </Card>
