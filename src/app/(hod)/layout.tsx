@@ -35,6 +35,7 @@ function navItems(
       label: "Assessments",
       badge: pendingMarking,
     },
+    { href: "/hod/marks", label: "Internal marks" },
     { href: "/hod/events", label: "Events" },
     {
       href: "/hod/roadmaps",

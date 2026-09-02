@@ -168,6 +168,11 @@ const CHECKS = [
     label: "service-role exemption on the write guards",
     probe: () => functionExists("is_trusted_server"),
   },
+  {
+    migration: "0025_internal_marks.sql",
+    label: "internal marks (IA, assignment, activity)",
+    probe: () => tableExists("student_subject_marks"),
+  },
 ];
 
 console.log(`\nChecking ${url}\n`);

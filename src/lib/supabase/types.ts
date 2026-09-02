@@ -344,6 +344,65 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      mark_components: {
+        Row: {
+          code: string;
+          label: string;
+          max_marks: number;
+          sort_order: number;
+          is_active: boolean;
+        };
+        Insert: {
+          code: string;
+          label: string;
+          max_marks: number;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: Partial<{
+          label: string;
+          max_marks: number;
+          sort_order: number;
+          is_active: boolean;
+        }>;
+        Relationships: [];
+      };
+      student_subject_marks: {
+        Row: {
+          student_id: string;
+          subject_id: string;
+          component_code: string;
+          // `numeric`. Arrives as a number from the installed stack, but
+          // PostgREST may serialise it as a string; queries/marks.ts
+          // normalises both rather than depending on which.
+          marks: number | string | null;
+          max_marks: number;
+          remark: string | null;
+          published_at: string | null;
+          entered_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          student_id: string;
+          subject_id: string;
+          component_code: string;
+          marks?: number | null;
+          max_marks: number;
+          remark?: string | null;
+          published_at?: string | null;
+          // Pinned by trigger to the calling faculty member — supplying it
+          // here has no effect, which is the point.
+          entered_by?: string | null;
+        };
+        Update: Partial<{
+          marks: number | null;
+          max_marks: number;
+          remark: string | null;
+          published_at: string | null;
+        }>;
+        Relationships: [];
+      };
       student_roadmaps: {
         Row: {
           id: string;

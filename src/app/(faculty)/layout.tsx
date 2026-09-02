@@ -30,6 +30,7 @@ function navItems(
       label: "Assessments",
       badge: pendingMarking,
     },
+    { href: "/faculty/marks", label: "Internal marks" },
     { href: "/faculty/events", label: "Events" },
     {
       href: "/faculty/roadmaps",

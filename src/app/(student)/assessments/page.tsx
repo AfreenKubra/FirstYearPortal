@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { StartAttemptButton } from "@/components/assessments/StartAttemptButton";
+import { StudentMarksTable } from "@/components/marks/StudentMarksTable";
 import { getOwnStudent } from "@/lib/queries/student";
 import { getStudentAssessments } from "@/lib/queries/assessments";
+import { getStudentMarks, listMarkComponents } from "@/lib/queries/marks";
 import {
   assessmentKindLabel,
   attemptStatusLabel,
@@ -17,7 +19,13 @@ export default async function StudentAssessmentsPage() {
   const student = await getOwnStudent();
   if (!student) redirect("/login");
 
-  const items = await getStudentAssessments();
+  // Three independent reads, so a missing marks migration cannot delay the
+  // assessment list it has nothing to do with.
+  const [items, markComponents, subjectMarks] = await Promise.all([
+    getStudentAssessments(),
+    listMarkComponents(),
+    getStudentMarks(student.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -28,6 +36,13 @@ export default async function StudentAssessmentsPage() {
           results appear here once they have been marked.
         </p>
       </header>
+
+      {/* Internal marks first: they are the figures a student checks most
+          often, and they exist whether or not any assessment has been set. */}
+      <StudentMarksTable
+        components={markComponents}
+        subjects={subjectMarks}
+      />
 
       {items.length === 0 ? (
         <Card>

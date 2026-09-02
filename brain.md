@@ -32,6 +32,8 @@ src/middleware.ts     security layer 1: session/role/status/profile gate — see
 
 src/components/ui/          Button, Card, Field, FormStatus, Logo, HeroRoleSwitcher
 src/components/directory/   filters, table, charts, profile view, dashboards — SHARED by faculty/hod/admin
+src/components/marks/       MarksWorkspace + MarksGrid (staff, SHARED by faculty/hod),
+                             StudentMarksTable (student view, rendered on /assessments)
 src/components/registration/ auth/ profile/ achievements/ assessments/ events/ resources/ roadmap/ admin/ vtu/
                              — one folder per feature area, form + display components
 
@@ -47,13 +49,15 @@ src/lib/resources/    bulk import, coverage, filters, recommendation matching
 src/lib/roadmap/      generate.ts (rule-based), ai-generate.ts (Claude-backed), ai-schema.ts,
                        exam-track.ts, fingerprint.ts, link-providers.ts, links.ts, provider.ts, refresh.ts
 src/lib/directory/    CSV export builder (provenance header, CSV-injection escaping)
+src/lib/marks/        compute.ts — pure: sumRecorded, releasedOnly, pivotToComponents, validateMark
 src/lib/profile-completion.ts   pure fn: computes profile_completion_percent
 
 src/config/            roles.ts, branding.ts, residence.ts, states.ts, achievements.ts,
-                       assessments.ts, events.ts, resources.ts, roadmap.ts, notifications.ts
+                       assessments.ts, events.ts, resources.ts, roadmap.ts, notifications.ts,
+                       marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0024, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0025, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```
@@ -104,6 +108,16 @@ a top-level `tests/` tree). Run all of them with `npm test`.
    that "shouldn't" happen. Regenerate with `supabase gen types` eventually.
 10. **Service-role key** is read in exactly one file, `src/lib/supabase/server.ts`.
     Keep it that way — it must never reach a client bundle.
+11. **Internal marks never compute a CIE total** (migration 0025). VTU's CIE
+    formula varies by scheme and subject kind, so the portal only ever shows
+    `SUM_LABEL` ("Sum of recorded components") from `src/config/marks.ts`.
+    Same family of rule as the roadmap's "invents nothing". Also: a blank mark
+    is *not* a zero — `sumRecorded()` skips unmarked components rather than
+    counting them, and the UI renders `—`. Don't "helpfully" default to 0.
+12. **Marks components are a table, not an enum** (`mark_components`), so
+    adding IA3 is a row. Deliberate — migrations 0010 and 0018 exist only
+    because Postgres won't let a new enum value be used in the transaction
+    that added it.
 
 ## Commands
 
@@ -125,7 +139,15 @@ check; `npm run build` before anything deploy-adjacent.
 ## Current known gaps (see MANUAL-STEPS.md for full detail/why)
 
 - No integration/RLS/e2e tests — only unit tests (pure logic, validation,
-  filters, grading, CSV escaping).
+  filters, grading, CSV escaping, marks arithmetic).
+- **Internal marks has no subject-teacher table.** Any staff member who can
+  see a student can edit that student's marks for any subject; `entered_by`
+  (pinned by trigger) plus `audit_logs` is the whole accountability story. A
+  `subject_faculty` assignment table is the natural follow-up.
+- **`vtu_subjects` is empty on the live DB**, so `/faculty/marks` and
+  `/hod/marks` show "No subjects on file" until an admin enters the scheme
+  under Admin → VTU scheme. Not a bug — same deliberate empty-start as the
+  resource catalogue.
 - PDF export not built (CSV only). Assessment timer not enforced (display
   only). Section-wise English scoring not built. Event certificates not
   built. Resource-performance-based recommendations not built (needs
