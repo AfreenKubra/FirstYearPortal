@@ -17,7 +17,9 @@
     "backfill:migrations": "node scripts/backfill-migrations.mjs",
     "sync:admins": "node scripts/sync-admins.mjs",
     "seed:students": "node scripts/seed-students.mjs",
-    "seed:students:dry": "node scripts/seed-students.mjs --dry"
+    "seed:students:dry": "node scripts/seed-students.mjs --dry",
+    "seed:resources": "node scripts/seed-resources.mjs",
+    "seed:resources:dry": "node scripts/seed-resources.mjs --dry"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

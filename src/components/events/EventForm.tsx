@@ -3,10 +3,11 @@
 import { useFormState } from "react-dom";
 import { createEvent, updateEvent } from "@/lib/actions/events";
 import { idleState } from "@/lib/actions/form-state";
-import { Select, TextInput } from "@/components/ui/Field";
+import { CheckboxGroup, Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { EVENT_KINDS } from "@/config/events";
 import type { EventSummary } from "@/lib/queries/events";
+import type { LookupOption } from "@/lib/queries/student";
 
 /** `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time, not an ISO string. */
 function toLocalInput(value: string | null): string {
@@ -25,11 +26,20 @@ function toLocalInput(value: string | null): string {
  */
 export function EventForm({
   departments,
+  goals,
+  domains,
   event,
+  selectedGoalIds = [],
+  selectedDomainIds = [],
 }: {
   departments: Array<{ code: string; name: string }>;
+  goals: LookupOption[];
+  domains: LookupOption[];
   /** Absent when creating. */
   event?: EventSummary;
+  /** Existing subject tags, when editing. */
+  selectedGoalIds?: number[];
+  selectedDomainIds?: number[];
 }) {
   const [state, formAction] = useFormState(
     event ? updateEvent : createEvent,
@@ -174,6 +184,35 @@ export function EventForm({
             </span>
           </span>
         </label>
+      </div>
+
+      {/* Subject tags (migration 0024). Distinct from "who it is open to"
+          above: that decides who *can* attend, this decides who is *told it
+          is relevant*. A workshop with no tags still appears on the calendar;
+          it just never shows up in a student's roadmap as a session for the
+          goal they picked. */}
+      <div className="space-y-4 rounded-card border border-indigo-100 bg-parchment-sunk/40 p-4">
+        <p className="text-sm text-ink-muted">
+          Tag what this event is about. These are the same words students used
+          at registration, and they are what lets a student&rsquo;s roadmap say
+          &ldquo;3 workshops for your goal&rdquo;. Untagged events still appear
+          on the events page — they just are not counted anywhere.
+        </p>
+
+        <CheckboxGroup
+          legend="Career goals"
+          name="goalIds"
+          options={goals}
+          defaultSelected={selectedGoalIds}
+          columns={2}
+        />
+        <CheckboxGroup
+          legend="Technical domains"
+          name="domainIds"
+          options={domains}
+          defaultSelected={selectedDomainIds}
+          columns={2}
+        />
       </div>
 
       <SubmitButton pendingLabel="Saving…">

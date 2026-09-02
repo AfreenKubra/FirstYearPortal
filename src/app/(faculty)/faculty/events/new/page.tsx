@@ -12,7 +12,7 @@ export default async function NewFacultyEventPage() {
   const staff = await getOwnStaff();
   if (!staff) redirect("/login");
 
-  const { departments } = await getLookups();
+  const { departments, goals, domains } = await getLookups();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -29,7 +29,11 @@ export default async function NewFacultyEventPage() {
           description="Set it up, then publish it so students in its audience can register."
         />
         <CardBody>
-          <EventForm departments={departments} />
+          <EventForm
+            departments={departments}
+            goals={goals}
+            domains={domains}
+          />
         </CardBody>
       </Card>
     </div>

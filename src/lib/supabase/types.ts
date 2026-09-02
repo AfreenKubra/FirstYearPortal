@@ -445,6 +445,13 @@ export type Database = {
           verified_at: string | null;
           added_by: string | null;
           is_active: boolean;
+          // 0023. `date`, not `timestamptz` — postgrest returns these as bare
+          // `YYYY-MM-DD` strings, and they are typed as strings here so no
+          // caller is tempted to hand one to `new Date()`, which reads a bare
+          // date as UTC midnight and prints the previous day west of London.
+          occurs_on: string | null;
+          registration_opens_on: string | null;
+          registration_closes_on: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -458,6 +465,9 @@ export type Database = {
           semester?: number | null;
           estimated_hours?: number | null;
           is_free?: boolean | null;
+          occurs_on?: string | null;
+          registration_opens_on?: string | null;
+          registration_closes_on?: string | null;
           added_by?: string | null;
         };
         Update: Partial<{
@@ -473,6 +483,9 @@ export type Database = {
           is_verified: boolean;
           verified_by: string | null;
           verified_at: string | null;
+          occurs_on: string | null;
+          registration_opens_on: string | null;
+          registration_closes_on: string | null;
           is_active: boolean;
         }>;
         Relationships: [];
@@ -492,6 +505,24 @@ export type Database = {
       resource_domains: {
         Row: { resource_id: string; domain_id: number };
         Insert: { resource_id: string; domain_id: number };
+        Update: never;
+        Relationships: [];
+      };
+      // 0024. What an event is *about*, as opposed to `events`' own
+      // department/semester/section columns, which say who may attend. A
+      // workshop open to everyone can still be tagged to one goal, and a
+      // workshop open to one section can be about nothing in particular.
+      // Composite primary keys, so there is no row to update — retagging is a
+      // delete and an insert, matching `resource_goals` above.
+      event_goals: {
+        Row: { event_id: string; goal_id: number };
+        Insert: { event_id: string; goal_id: number };
+        Update: never;
+        Relationships: [];
+      };
+      event_domains: {
+        Row: { event_id: string; domain_id: number };
+        Insert: { event_id: string; domain_id: number };
         Update: never;
         Relationships: [];
       };

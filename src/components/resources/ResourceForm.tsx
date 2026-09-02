@@ -5,7 +5,7 @@ import { createResource } from "@/lib/actions/resources";
 import { idleState } from "@/lib/actions/form-state";
 import { CheckboxGroup, Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
-import { RESOURCE_KINDS } from "@/config/resources";
+import { RESOURCE_KINDS, COST_OPTIONS } from "@/config/resources";
 import type { LookupOption } from "@/lib/queries/student";
 
 /**
@@ -128,15 +128,53 @@ export function ResourceForm({
         />
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
-        <input
-          type="checkbox"
-          name="isFree"
-          defaultChecked
-          className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-700"
-        />
-        <span>Free to access</span>
-      </label>
+      {/* Three options, defaulting to "not recorded". This was a checkbox,
+          which could only ever produce Free or Paid — and defaulted to
+          checked, so an unticked box silently asserted "Paid" about a page
+          nobody had priced. Cost is a claim about somebody else's site, and
+          the honest default is to make no claim at all. */}
+      <Select
+        label="Cost"
+        name="cost"
+        defaultValue="unknown"
+        options={COST_OPTIONS.map((c) => ({ value: c.value, label: c.label }))}
+        error={errors.cost}
+        hint="Leave as “Cost not recorded” unless you have checked the provider's page."
+      />
+
+      {/* Dates, for the kinds that have them. Empty means unknown — the
+          roadmap's exam panel renders around a missing date rather than
+          inventing one. */}
+      <fieldset className="space-y-3 rounded-card border border-indigo-100 bg-parchment-sunk/40 p-4">
+        <legend className="px-1 text-sm font-medium text-ink-muted">
+          Dates (exams and workshops)
+        </legend>
+        <p className="text-sm text-ink-muted">
+          Only for things that happen on a day. Leave blank for courses and
+          anything you have not confirmed — a student sees “date not recorded”,
+          which is better than a date that turns out to be wrong.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <TextInput
+            label="Registration opens"
+            name="registrationOpensOn"
+            type="date"
+            error={errors.registrationOpensOn}
+          />
+          <TextInput
+            label="Registration closes"
+            name="registrationClosesOn"
+            type="date"
+            error={errors.registrationClosesOn}
+          />
+          <TextInput
+            label="Date it happens"
+            name="occursOn"
+            type="date"
+            error={errors.occursOn}
+          />
+        </div>
+      </fieldset>
 
       <div className="space-y-4 rounded-card border border-indigo-100 bg-parchment-sunk/40 p-4">
         <p className="text-sm text-ink-muted">

@@ -7,6 +7,11 @@ import {
   recommendResources,
   type ResourceForMatching,
 } from "@/lib/resources/recommend";
+import {
+  filterExamResourcesForGoals,
+  filterResourcesForDomains,
+} from "@/lib/resources/filters";
+import { tagCoverage, type TagCoverage } from "@/lib/resources/coverage";
 import type { ResourceKind } from "@/config/resources";
 
 /**
@@ -29,15 +34,20 @@ export type Resource = {
   departmentCode: string | null;
   semester: number | null;
   estimatedHours: number | null;
+  /** Three states: true=free, false=paid, null=nobody has recorded it. */
   isFree: boolean | null;
   isVerified: boolean;
+  /** `YYYY-MM-DD`, or null when undated. Kept as a string — see 0023. */
+  occursOn: string | null;
+  registrationOpensOn: string | null;
+  registrationClosesOn: string | null;
   interestIds: number[];
   goalIds: number[];
   domainIds: number[];
 };
 
 const RESOURCE_COLUMNS =
-  "id, title, description, kind, provider, url, department_code, semester, estimated_hours, is_free, is_verified" as const;
+  "id, title, description, kind, provider, url, department_code, semester, estimated_hours, is_free, is_verified, occurs_on, registration_opens_on, registration_closes_on" as const;
 
 /** The active catalogue, with its tags attached. */
 export async function listResources(): Promise<Resource[]> {
@@ -87,10 +97,37 @@ export async function listResources(): Promise<Resource[]> {
     estimatedHours: row.estimated_hours,
     isFree: row.is_free,
     isVerified: row.is_verified,
+    occursOn: row.occurs_on,
+    registrationOpensOn: row.registration_opens_on,
+    registrationClosesOn: row.registration_closes_on,
     interestIds: byInterest.get(row.id) ?? [],
     goalIds: byGoal.get(row.id) ?? [],
     domainIds: byDomain.get(row.id) ?? [],
   }));
+}
+
+/**
+ * The selection rules themselves live in `@/lib/resources/filters`, which
+ * imports nothing server-only and is therefore unit-testable. Re-exported here
+ * so a caller reaching for the catalogue finds them in one place.
+ */
+export { filterResourcesForDomains, filterExamResourcesForGoals };
+
+/** `filterResourcesForDomains`, fetching the catalogue itself. */
+export async function listResourcesForDomains(
+  domainIds: number[],
+  kinds?: ResourceKind[],
+): Promise<Resource[]> {
+  if (domainIds.length === 0) return [];
+  return filterResourcesForDomains(await listResources(), domainIds, kinds);
+}
+
+/** `filterExamResourcesForGoals`, fetching the catalogue itself. */
+export async function listExamResourcesForGoals(
+  goalIds: number[],
+): Promise<Resource[]> {
+  if (goalIds.length === 0) return [];
+  return filterExamResourcesForGoals(await listResources(), goalIds);
 }
 
 export type RecommendedResource = {
@@ -186,6 +223,48 @@ export async function getSavedResourceIds(): Promise<Set<string>> {
     .from("student_resources")
     .select("resource_id");
   return new Set((data ?? []).map((r) => r.resource_id));
+}
+
+/**
+ * Per-tag counts of students waiting and catalogue entries answering them.
+ *
+ * The roadmap's course shelf and exam track render from tags, so a tag nothing
+ * carries produces an empty panel for every student who chose it. That is
+ * correct behaviour — the alternative is showing untagged material under a
+ * heading naming their domain — but it is invisible from the admin side, where
+ * the catalogue looks fine. This turns it into a work queue ordered by how
+ * many students are affected.
+ *
+ * Reads the join tables directly rather than the directory view: the counts
+ * needed are per-tag, not per-student, and pulling the whole directory to
+ * derive them would be far more data for a number.
+ */
+export async function getTagCoverage(): Promise<TagCoverage[]> {
+  const supabase = createClient();
+
+  const [goalOpts, domainOpts, studentGoals, studentDomains, resources] =
+    await Promise.all([
+      supabase.from("career_goals").select("id, name"),
+      supabase.from("technical_domains").select("id, name"),
+      supabase.from("student_goals").select("goal_id"),
+      supabase.from("student_domains").select("domain_id"),
+      listResources(),
+    ]);
+
+  return [
+    ...tagCoverage(
+      goalOpts.data ?? [],
+      "goal",
+      (studentGoals.data ?? []).map((r) => r.goal_id),
+      resources.flatMap((r) => r.goalIds),
+    ),
+    ...tagCoverage(
+      domainOpts.data ?? [],
+      "domain",
+      (studentDomains.data ?? []).map((r) => r.domain_id),
+      resources.flatMap((r) => r.domainIds),
+    ),
+  ];
 }
 
 /** Count for the admin badge: entries nobody has checked yet. */

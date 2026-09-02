@@ -245,6 +245,90 @@ export function rosterSummary(roster: RosterEntry[]): AttendanceSummary {
   return summariseRoster(roster);
 }
 
+/**
+ * Upcoming events matching a student's goals or domains (migration 0024).
+ *
+ * Answers "how many workshops are there for the goal I picked?" — a question
+ * the schema could not answer before those tag tables existed, because events
+ * knew who they were *for* (department/semester/section) but never what they
+ * were *about*.
+ *
+ * Two things this deliberately does not do:
+ *
+ *   - It does not bypass RLS. The `events` select policy already restricts a
+ *     student to published events aimed at them, so an event they could never
+ *     attend cannot inflate this count.
+ *   - It does not fall back to counting untagged events. An untagged event is
+ *     not evidence of anything, and rolling it in would make the number drift
+ *     upward as unrelated events were published.
+ *
+ * A zero here means "none tagged", which the UI must say in those words —
+ * "0 workshops" would read as "your college runs none", and the honest
+ * statement is that none have been tagged yet.
+ */
+export async function countUpcomingEventsByTag({
+  goalIds = [],
+  domainIds = [],
+  kind,
+}: {
+  goalIds?: number[];
+  domainIds?: number[];
+  kind?: EventKind;
+}): Promise<number> {
+  if (goalIds.length === 0 && domainIds.length === 0) return 0;
+
+  const supabase = createClient();
+
+  const [goalRows, domainRows] = await Promise.all([
+    goalIds.length > 0
+      ? supabase.from("event_goals").select("event_id").in("goal_id", goalIds)
+      : Promise.resolve({ data: [] as Array<{ event_id: string }> }),
+    domainIds.length > 0
+      ? supabase.from("event_domains").select("event_id").in("domain_id", domainIds)
+      : Promise.resolve({ data: [] as Array<{ event_id: string }> }),
+  ]);
+
+  // Union, not intersection: a workshop tagged to either the student's goal or
+  // their domain is relevant to them. Deduplicated so an event tagged both
+  // ways is one workshop, not two.
+  const eventIds = Array.from(
+    new Set([
+      ...(goalRows.data ?? []).map((r) => r.event_id),
+      ...(domainRows.data ?? []).map((r) => r.event_id),
+    ]),
+  );
+
+  if (eventIds.length === 0) return 0;
+
+  let query = supabase
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .in("id", eventIds)
+    .eq("is_published", true)
+    .gt("starts_at", new Date().toISOString());
+
+  if (kind) query = query.eq("kind", kind);
+
+  const { count } = await query;
+  return count ?? 0;
+}
+
+/** The goal/domain tags on a set of events, for the edit form and listings. */
+export async function getEventTags(
+  eventId: string,
+): Promise<{ goalIds: number[]; domainIds: number[] }> {
+  const supabase = createClient();
+  const [goals, domains] = await Promise.all([
+    supabase.from("event_goals").select("goal_id").eq("event_id", eventId),
+    supabase.from("event_domains").select("domain_id").eq("event_id", eventId),
+  ]);
+
+  return {
+    goalIds: (goals.data ?? []).map((r) => r.goal_id),
+    domainIds: (domains.data ?? []).map((r) => r.domain_id),
+  };
+}
+
 /** Count for the staff sidebar badge: published events still to come. */
 export async function getUpcomingEventCount(): Promise<number> {
   const supabase = createClient();

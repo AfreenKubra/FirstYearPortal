@@ -22,11 +22,20 @@ export function DistributionChart({
   description,
   data,
   emptyMessage = "No data yet.",
+  unit = "students",
 }: {
   title: string;
   description?: string;
   data: Slice[];
   emptyMessage?: string;
+  /**
+   * What the counts are counting, for the caption and the screen-reader-only
+   * column header. Defaults to "students" because that is what every existing
+   * caller charts; the roadmap charts courses, and a caption reading "12
+   * students in total" above a list of courses would be a plain falsehood
+   * heard only by the readers least able to check it against the bars.
+   */
+  unit?: string;
 }) {
   const max = data.reduce((acc, item) => Math.max(acc, item.count), 0);
   const total = data.reduce((acc, item) => acc + item.count, 0);
@@ -40,12 +49,14 @@ export function DistributionChart({
         ) : (
           <table className="w-full text-sm">
             <caption className="sr-only">
-              {title} — {total} students in total
+              {title} — {total} {unit} in total
             </caption>
             <thead className="sr-only">
               <tr>
                 <th scope="col">Category</th>
-                <th scope="col">Students</th>
+                <th scope="col">
+                  {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                </th>
                 <th scope="col">Share</th>
               </tr>
             </thead>

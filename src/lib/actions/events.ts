@@ -44,6 +44,70 @@ function toIso(value: string | null): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/**
+ * The goal/domain tags on the form (migration 0024).
+ *
+ * Read here rather than through `eventSchema` because that schema is imported
+ * by the client form as well, and tagging is a server-side concern with its
+ * own table. Anything that is not a positive integer is dropped rather than
+ * failing the whole submission — a malformed tag id is not worth losing a
+ * filled-in event form over, and the foreign keys refuse anything invented.
+ */
+function readEventTags(formData: FormData) {
+  const ids = (name: string) =>
+    formData
+      .getAll(name)
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0);
+
+  return { goalIds: ids("goalIds"), domainIds: ids("domainIds") };
+}
+
+/**
+ * Replaces an event's tags wholesale.
+ *
+ * Mirrors `replaceTags` in `actions/resources.ts`, for the same reason: the
+ * set is small, always edited as a whole, and a partial update that dropped
+ * one tag would quietly change which students the event is counted for.
+ *
+ * Best-effort. A tagging failure must not cost the author the event itself —
+ * an untagged event is a valid event, just one that does not yet show up in a
+ * roadmap's workshop count.
+ */
+async function replaceEventTags(
+  eventId: string,
+  tags: { goalIds: number[]; domainIds: number[] },
+) {
+  const supabase = createClient();
+
+  await Promise.all([
+    supabase.from("event_goals").delete().eq("event_id", eventId),
+    supabase.from("event_domains").delete().eq("event_id", eventId),
+  ]);
+
+  // PromiseLike, not Promise: postgrest-js builders are thenable but are not
+  // Promise instances, so they lack `catch`/`finally`.
+  const inserts: Array<PromiseLike<unknown>> = [];
+  if (tags.goalIds.length > 0) {
+    inserts.push(
+      supabase
+        .from("event_goals")
+        .insert(tags.goalIds.map((goal_id) => ({ event_id: eventId, goal_id }))),
+    );
+  }
+  if (tags.domainIds.length > 0) {
+    inserts.push(
+      supabase
+        .from("event_domains")
+        .insert(
+          tags.domainIds.map((domain_id) => ({ event_id: eventId, domain_id })),
+        ),
+    );
+  }
+
+  await Promise.all(inserts);
+}
+
 export async function createEvent(
   _prev: ActionState,
   formData: FormData,
@@ -96,6 +160,8 @@ export async function createEvent(
   if (error || !data) {
     return { status: "error", message: "Could not create that event." };
   }
+
+  await replaceEventTags(data.id, readEventTags(formData));
 
   revalidatePath("/faculty/events");
   redirect(`/faculty/events/${data.id}`);
@@ -154,6 +220,8 @@ export async function updateEvent(
   if (error) {
     return { status: "error", message: "Could not save those changes." };
   }
+
+  await replaceEventTags(id, readEventTags(formData));
 
   revalidatePath(`/faculty/events/${id}`);
   return { status: "success", message: "Saved." };

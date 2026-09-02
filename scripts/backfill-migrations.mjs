@@ -122,6 +122,18 @@ const SIGNATURES = [
     "0022_roadmap_milestone_links.sql",
     `select to_regclass('public.roadmap_milestone_links') is not null`,
   ],
+  [
+    // Column probe rather than a table one: 0023 alters `resources` in place,
+    // so `to_regclass` would return true for a database that never ran it.
+    "0023_resource_dates.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='resources'
+         and column_name='occurs_on')`,
+  ],
+  [
+    "0024_event_goal_domain_tags.sql",
+    `select to_regclass('public.event_goals') is not null`,
+  ],
 ];
 
 async function main() {

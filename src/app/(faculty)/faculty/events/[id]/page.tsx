@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { EventDetail } from "@/components/events/EventDetail";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { getLookups } from "@/lib/queries/student";
-import { getEvent, getRoster } from "@/lib/queries/events";
+import { getEvent, getEventTags, getRoster } from "@/lib/queries/events";
 
 export const metadata: Metadata = { title: "Event" };
 
@@ -18,9 +18,10 @@ export default async function FacultyEventPage({
   const event = await getEvent(params.id);
   if (!event) notFound();
 
-  const [roster, { departments }] = await Promise.all([
+  const [roster, { departments, goals, domains }, tags] = await Promise.all([
     getRoster(event.id),
     getLookups(),
+    getEventTags(event.id),
   ]);
 
   return (
@@ -28,6 +29,10 @@ export default async function FacultyEventPage({
       event={event}
       roster={roster}
       departments={departments}
+      goals={goals}
+      domains={domains}
+      selectedGoalIds={tags.goalIds}
+      selectedDomainIds={tags.domainIds}
       basePath="/faculty/events"
     />
   );

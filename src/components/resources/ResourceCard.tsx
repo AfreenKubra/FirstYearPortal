@@ -1,8 +1,10 @@
 import { Card, CardBody } from "@/components/ui/Card";
 import { SaveResourceButton } from "./ResourceActions";
 import {
+  COST_UNKNOWN_NOTICE,
   UNVERIFIED_NOTICE,
   VERIFIED_NOTICE,
+  costLabel,
   resourceKindLabel,
 } from "@/config/resources";
 import type { Resource } from "@/lib/queries/resources";
@@ -79,14 +81,20 @@ export function ResourceCard({
               </dd>
             </div>
           )}
-          {resource.isFree !== null && (
-            <div>
-              <dt className="inline">Cost: </dt>
-              <dd className="inline text-ink-muted">
-                {resource.isFree ? "Free" : "Paid"}
-              </dd>
-            </div>
-          )}
+          {/* Always shown, including the unrecorded case. Hiding the row when
+              nobody has priced the entry left a student to assume the cheapest
+              thing; naming the gap is both more honest and more useful. */}
+          <div>
+            <dt className="inline">Cost: </dt>
+            <dd
+              className="inline text-ink-muted"
+              title={
+                resource.isFree === null ? COST_UNKNOWN_NOTICE : undefined
+              }
+            >
+              {costLabel(resource.isFree).label}
+            </dd>
+          </div>
           {resource.departmentCode && (
             <div>
               <dt className="inline">For: </dt>

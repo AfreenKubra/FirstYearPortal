@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { Card, CardBody, CardHeader, EmptyState, StatTile } from "@/components/ui/Card";
 import { ResourceCard } from "@/components/resources/ResourceCard";
 import { ResourceForm } from "@/components/resources/ResourceForm";
+import { BulkResourceForm } from "@/components/resources/BulkResourceForm";
 import {
   RetireResourceButton,
   VerifyResourceButton,
 } from "@/components/resources/ResourceActions";
 import { getOwnAdmin } from "@/lib/queries/admin";
-import { listResources } from "@/lib/queries/resources";
+import { getTagCoverage, listResources } from "@/lib/queries/resources";
+import { describeGap, gaps } from "@/lib/resources/coverage";
 import { getLookups } from "@/lib/queries/student";
 
 export const metadata: Metadata = { title: "Resources" };
@@ -17,10 +19,16 @@ export default async function AdminResourcesPage() {
   const admin = await getOwnAdmin();
   if (!admin) redirect("/account-blocked?reason=no-staff-record");
 
-  const [resources, lookups] = await Promise.all([
+  const [resources, lookups, coverage] = await Promise.all([
     listResources(),
     getLookups(),
+    getTagCoverage(),
   ]);
+
+  // Tags students have chosen that nothing in the catalogue answers. The
+  // roadmap panels render from these tags, so each row is somebody looking at
+  // an empty panel right now — invisible from this page without saying so.
+  const tagGaps = gaps(coverage);
 
   const unchecked = resources.filter((r) => !r.isVerified);
   const checked = resources.filter((r) => r.isVerified);
@@ -56,6 +64,34 @@ export default async function AdminResourcesPage() {
           hint="Never recommended"
         />
       </div>
+
+      {tagGaps.length > 0 && (
+        <Card as="section">
+          <CardHeader
+            title="Tags nothing answers"
+            description="These students picked a goal or domain the catalogue has no entry for, so their roadmap shows an empty panel. Ordered by how many people are affected."
+          />
+          <CardBody>
+            <ul className="space-y-2">
+              {tagGaps.map((row) => (
+                <li
+                  key={`${row.kind}-${row.id}`}
+                  className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-indigo-100 bg-parchment-sunk px-3 py-2 text-sm text-ink-muted"
+                >
+                  <span className="rounded border border-indigo-200 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-indigo-800">
+                    {row.kind}
+                  </span>
+                  <span className="leading-relaxed">{describeGap(row)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+              A gap means nobody has added an entry yet — not that one ought to
+              exist. Adding a resource below and tagging it clears the row.
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       {unchecked.length > 0 && (
         <section aria-labelledby="unchecked-heading" className="space-y-3">
@@ -123,6 +159,16 @@ export default async function AdminResourcesPage() {
             domains={lookups.domains}
             canVerify
           />
+        </CardBody>
+      </Card>
+
+      <Card as="section">
+        <CardHeader
+          title="Add many at once"
+          description="A shortcut through the typing, not through the checking — every row lands unchecked, exactly as a single add does."
+        />
+        <CardBody>
+          <BulkResourceForm goals={lookups.goals} domains={lookups.domains} />
         </CardBody>
       </Card>
     </div>

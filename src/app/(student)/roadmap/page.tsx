@@ -3,10 +3,21 @@ import { redirect } from "next/navigation";
 import { Card, CardBody, EmptyState } from "@/components/ui/Card";
 import { RoadmapView } from "@/components/roadmap/RoadmapView";
 import { RoadmapAnalysis } from "@/components/roadmap/RoadmapAnalysis";
+import { ExamTrackPanel } from "@/components/roadmap/ExamTrackPanel";
+import {
+  DomainCourseShelf,
+  type DomainShelf,
+} from "@/components/roadmap/DomainCourseShelf";
 import { getOwnStudent, getLookups, getProfileSnapshot } from "@/lib/queries/student";
 import { getOwnRoadmap } from "@/lib/queries/roadmaps";
 import { getDepartmentStats } from "@/lib/queries/vtu";
 import { refreshOwnRoadmap } from "@/lib/roadmap/refresh";
+import {
+  filterExamResourcesForGoals,
+  filterResourcesForDomains,
+  listResources,
+} from "@/lib/queries/resources";
+import { countUpcomingEventsByTag } from "@/lib/queries/events";
 
 export const metadata: Metadata = { title: "My roadmap" };
 
@@ -38,6 +49,51 @@ export default async function StudentRoadmapPage() {
   };
 
   const chosenDomains = nameById(lookups.domains, snapshot.domainIds);
+  const chosenGoals = nameById(lookups.goals, snapshot.goalIds);
+
+  /**
+   * The catalogue and the college calendar, read once and sliced two ways.
+   *
+   * `listResources()` already fetches every tag map, so both panels come out
+   * of one round trip rather than three — and, more importantly, out of the
+   * *same* snapshot, so the exam track and the course shelf cannot disagree
+   * about what is in the catalogue.
+   *
+   * Both counts below deliberately come from tagged rows only. Falling back to
+   * "all upcoming workshops" would make the number drift upward every time an
+   * unrelated event was published, and "3 workshops for your goal" would stop
+   * being true the moment it was most useful.
+   */
+  const [catalogue, workshopsOnCalendar] = await Promise.all([
+    listResources(),
+    countUpcomingEventsByTag({
+      goalIds: snapshot.goalIds,
+      domainIds: snapshot.domainIds,
+      kind: "workshop",
+    }),
+  ]);
+
+  const exams = filterExamResourcesForGoals(catalogue, snapshot.goalIds);
+
+  const workshopsInCatalogue = filterResourcesForDomains(
+    catalogue,
+    snapshot.domainIds,
+    ["workshop"],
+  ).length;
+
+  // One shelf per domain the student picked, in the order the lookup returns
+  // them. Domains with nothing tagged are kept as empty shelves so the panel
+  // can name the gap rather than quietly omitting the domain.
+  const shelves: DomainShelf[] = snapshot.domainIds
+    .map((id) => {
+      const domain = lookups.domains.find((d) => d.id === id);
+      if (!domain) return null;
+      return {
+        domain: domain.name,
+        resources: filterResourcesForDomains(catalogue, [id]),
+      };
+    })
+    .filter((s): s is DomainShelf => s !== null);
 
   // Phrased as the student would describe the section, not as column names.
   const profileGaps = [
@@ -76,6 +132,16 @@ export default async function StudentRoadmapPage() {
         </Card>
       ) : (
         <>
+          {/* Above the milestones: a date you can miss outranks a plan you can
+              do at any time. Renders nothing at all when no dated exam is
+              tagged to the student's goals. */}
+          <ExamTrackPanel
+            exams={exams}
+            goalNames={chosenGoals}
+            workshopsOnCalendar={workshopsOnCalendar}
+            workshopsInCatalogue={workshopsInCatalogue}
+          />
+
           <RoadmapAnalysis
             roadmap={roadmap}
             chosenDomains={chosenDomains}
@@ -85,6 +151,9 @@ export default async function StudentRoadmapPage() {
           />
 
           <RoadmapView roadmap={roadmap} interactive />
+
+          {/* Below: reference material, browsed rather than scheduled. */}
+          <DomainCourseShelf shelves={shelves} chosenDomains={chosenDomains} />
         </>
       )}
     </div>

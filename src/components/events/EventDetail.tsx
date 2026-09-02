@@ -6,6 +6,7 @@ import { PublishEventToggle } from "./EventActions";
 import { eventKindLabel, registrationLabel } from "@/config/events";
 import { summariseRoster } from "@/lib/events/registration";
 import type { EventSummary, RosterEntry } from "@/lib/queries/events";
+import type { LookupOption } from "@/lib/queries/student";
 
 /**
  * One event: who signed up, who turned up, and what they thought.
@@ -19,11 +20,20 @@ export function EventDetail({
   event,
   roster,
   departments,
+  goals,
+  domains,
+  selectedGoalIds = [],
+  selectedDomainIds = [],
   basePath,
 }: {
   event: EventSummary;
   roster: RosterEntry[];
   departments: Array<{ code: string; name: string }>;
+  goals: LookupOption[];
+  domains: LookupOption[];
+  /** Subject tags already on this event (migration 0024). */
+  selectedGoalIds?: number[];
+  selectedDomainIds?: number[];
   basePath: string;
 }) {
   const summary = summariseRoster(roster);
@@ -195,7 +205,14 @@ export function EventDetail({
           description="Changing the audience changes who can see this from now on."
         />
         <CardBody>
-          <EventForm departments={departments} event={event} />
+          <EventForm
+            departments={departments}
+            goals={goals}
+            domains={domains}
+            event={event}
+            selectedGoalIds={selectedGoalIds}
+            selectedDomainIds={selectedDomainIds}
+          />
         </CardBody>
       </Card>
     </div>
