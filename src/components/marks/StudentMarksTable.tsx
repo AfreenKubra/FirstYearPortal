@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { SUM_DISCLAIMER, SUM_LABEL, type MarkComponent } from "@/config/marks";
 import type { StudentSubjectMarks } from "@/lib/queries/marks";
 
@@ -24,9 +24,37 @@ export function StudentMarksTable({
   components: MarkComponent[];
   subjects: StudentSubjectMarks[];
 }) {
-  // Nothing released yet renders nothing at all. A table of dashes tells a
-  // student only that the portal knows their timetable.
-  if (subjects.length === 0) return null;
+  // Nothing released yet still renders the section, with an empty state
+  // saying who fills it and when — the same treatment the assessment list
+  // below it gets.
+  //
+  // It deliberately does NOT render the table with every cell dashed. That
+  // would show a student a grid of blanks against subjects nobody has marked,
+  // which reads as "you scored nothing" far more readily than "nothing has
+  // been entered". An empty state says the second thing without the first
+  // being available to misread.
+  if (subjects.length === 0) {
+    return (
+      <Card as="section">
+        <CardHeader
+          title="Internal marks"
+          description="Your IA, assignment, and activity marks appear here."
+        />
+        <CardBody>
+          <EmptyState
+            title="No marks released yet"
+            description={
+              components.length > 0
+                ? `When your faculty record and release them, they appear here subject by subject, with each component separately: ${components
+                    .map((c) => `${c.label} (out of ${c.maxMarks})`)
+                    .join(", ")}.`
+                : "When your faculty record and release your internal marks, they appear here subject by subject."
+            }
+          />
+        </CardBody>
+      </Card>
+    );
+  }
 
   return (
     <Card as="section">
