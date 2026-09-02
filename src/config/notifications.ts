@@ -10,7 +10,8 @@ export type NotificationKind =
   | "assessment_graded"
   | "event_seat_confirmed"
   | "roadmap_approved"
-  | "roadmap_returned";
+  | "roadmap_returned"
+  | "marks_released";
 
 /**
  * How each kind reads at a glance. Tone matters here: a student sees these
@@ -25,6 +26,7 @@ export const NOTIFICATION_LABELS: Record<NotificationKind, string> = {
   event_seat_confirmed: "Event",
   roadmap_approved: "Roadmap",
   roadmap_returned: "Roadmap",
+  marks_released: "Marks",
 };
 
 export function notificationLabel(value: string | null | undefined): string {

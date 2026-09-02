@@ -62,13 +62,15 @@ src/config/            roles.ts, branding.ts, residence.ts, states.ts, achieveme
                        marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0026, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0028, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```
 
-Every `__tests__/` directory sits next to the code it tests (co-located, not
-a top-level `tests/` tree). Run all of them with `npm test`.
+Unit tests live in `__tests__/` next to the code they test; `npm test` runs
+them and needs no database. The RLS suite is the exception — it lives in
+`tests/rls/`, has its own vitest config, needs a live DB, and runs via
+`npm run test:rls`.
 
 ## Rules that must not be broken silently
 
@@ -139,7 +141,8 @@ npm run dev            # dev server
 npm run build           # production build
 npm run typecheck        # tsc --noEmit
 npm run lint
-npm test                 # vitest run (all __tests__/*)
+npm test                 # vitest run (all src/**/__tests__/*) — fast, no DB
+npm run test:rls         # RLS policy suite — needs a live DB + DATABASE_URL
 npm run migrate:dry      # what's pending
 npm run check:schema     # what the live DB is actually missing
 npm run sync:admins -- --dry
@@ -151,8 +154,11 @@ check; `npm run build` before anything deploy-adjacent.
 
 ## Current known gaps (see MANUAL-STEPS.md for full detail/why)
 
-- No integration/RLS/e2e tests — only unit tests (pure logic, validation,
-  filters, grading, CSV escaping, marks arithmetic).
+- RLS is now covered for marks/subject_faculty/notifications by
+  `npm run test:rls` (`tests/rls/`, own vitest config, real DB, fixtures
+  created and torn down per run). **Every other table's policies are still
+  unverified** — achievements, events, assessments, resources, roadmaps.
+  Still no integration or e2e tests.
 - Internal marks editing is restricted to the assigned subject teacher, the
   HOD of that department, and admins (migration 0026, `subject_faculty`).
   A subject with **no** teacher assigned falls back to HOD/admin only — a
@@ -171,8 +177,8 @@ check; `npm run build` before anything deploy-adjacent.
   (`{base}/marks/export`) plus the details CSV, which also carries three
   marks summary columns. All share `lib/marks/export.ts` and are scoped
   purely by RLS. Marks coverage is on the admin overview too
-  (`summariseMarks` in `lib/admin/analytics.ts`). Still missing: no
-  notification is raised when marks are released.
+  (`summariseMarks` in `lib/admin/analytics.ts`), and releasing a component
+  notifies each student (0027/0028) — a withdrawal is deliberately silent.
 - PDF export not built (CSV only). Assessment timer not enforced (display
   only). Section-wise English scoring not built. Event certificates not
   built. Resource-performance-based recommendations not built (needs

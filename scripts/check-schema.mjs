@@ -178,6 +178,28 @@ const CHECKS = [
     label: "subject teachers, and marks restricted to them",
     probe: () => tableExists("subject_faculty"),
   },
+  {
+    migration: "0027_marks_released_kind.sql",
+    label: "'marks_released' value on notification_kind",
+    probe: async () => {
+      // Filtering on an enum value Postgres does not know is an error, so a
+      // clean query proves the value exists — same trick as the 'hod' and
+      // 'auto' probes above.
+      const { error } = await db
+        .from("notifications")
+        .select("id")
+        .eq("kind", "marks_released")
+        .limit(1);
+      return !error;
+    },
+  },
+  // 0028_marks_released_notification.sql has no probe on purpose. It creates
+  // only a trigger and its function, and PostgREST does not expose trigger
+  // functions in its schema cache — `functionExists` returns PGRST202 for one
+  // whether or not it is there, so a probe would report MISSING for an
+  // applied migration. That is worse than no probe: it sends somebody to
+  // re-run a migration that already ran. It is listed as unchecked below
+  // instead, which is the honest answer.
 ];
 
 console.log(`\nChecking ${url}\n`);
