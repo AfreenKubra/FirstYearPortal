@@ -1,6 +1,13 @@
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { MarksGrid } from "./MarksGrid";
-import { getMarksGrid, listMarkableSubjects } from "@/lib/queries/marks";
+import { SubjectTeacherForm } from "./SubjectTeacherForm";
+import {
+  getMarksGrid,
+  listAssignableFaculty,
+  listMarkableSubjects,
+  listSubjectAssignments,
+} from "@/lib/queries/marks";
+import { listVtuSubjects } from "@/lib/queries/vtu";
 
 /**
  * The staff marks workspace — one implementation, two audiences.
@@ -17,11 +24,22 @@ export async function MarksWorkspace({
   departmentCode,
   subjectId,
   section,
+  canAssignTeachers = false,
 }: {
   basePath: string;
   departmentCode: string;
   subjectId?: string;
   section?: string;
+  /**
+   * Renders the teaching-assignment card. True for a head of department,
+   * who may write `subject_faculty` for their own department (migration
+   * 0026), and false for a plain faculty member, for whom RLS would refuse
+   * the write — showing them a form that always fails would be worse than
+   * not showing it.
+   *
+   * This is a display decision only. The database is what actually refuses.
+   */
+  canAssignTeachers?: boolean;
 }) {
   const subjects = await listMarkableSubjects(departmentCode);
 
@@ -110,7 +128,45 @@ export async function MarksWorkspace({
           </CardBody>
         </Card>
       )}
+
+      {canAssignTeachers && <TeacherAssignmentCard departmentCode={departmentCode} />}
     </div>
+  );
+}
+
+/**
+ * Assigning teachers, for a head of department.
+ *
+ * Administrators get the same control on Admin → VTU scheme, beside the
+ * subjects themselves. A HOD does not, because they may not edit the scheme
+ * (0019 restricts that to administrators) and a VTU page would imply
+ * otherwise — so it lives here, next to the marks the assignment governs.
+ */
+async function TeacherAssignmentCard({
+  departmentCode,
+}: {
+  departmentCode: string;
+}) {
+  const [subjects, faculty, assignments] = await Promise.all([
+    listVtuSubjects(),
+    listAssignableFaculty(departmentCode),
+    listSubjectAssignments(departmentCode),
+  ]);
+
+  return (
+    <Card as="section">
+      <CardHeader
+        title="Who teaches what"
+        description="Only the assigned teacher can edit a subject's marks, alongside you and administrators. A subject with nobody assigned still falls back to you — it is a fallback, not a lockout."
+      />
+      <CardBody>
+        <SubjectTeacherForm
+          subjects={subjects.filter((s) => s.departmentCode === departmentCode)}
+          faculty={faculty}
+          assignments={assignments}
+        />
+      </CardBody>
+    </Card>
   );
 }
 

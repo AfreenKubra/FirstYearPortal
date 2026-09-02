@@ -242,13 +242,21 @@ export type SubjectAssignment = {
 };
 
 /**
- * Every teaching assignment on file, for the admin screen.
+ * Teaching assignments on file — every department, or just one.
+ *
+ * `subject_faculty`'s read policy is `using (true)`, because a timetable is
+ * not a disclosure. That is right for the database and wrong for a screen: a
+ * head of department managing their own staff should not be shown, or have to
+ * scroll past, five other departments. Hence the filter, applied here rather
+ * than in RLS.
  *
  * Three queries rather than embedded joins, for the `Relationships: []`
- * reason documented in `supabase/types.ts`. The row counts here are one per
- * subject-teacher pair, so this stays small.
+ * reason documented in `supabase/types.ts`. One row per subject-teacher pair,
+ * so this stays small.
  */
-export async function listSubjectAssignments(): Promise<SubjectAssignment[]> {
+export async function listSubjectAssignments(
+  departmentCode?: string,
+): Promise<SubjectAssignment[]> {
   const supabase = createClient();
 
   const { data: links } = await supabase
@@ -294,6 +302,9 @@ export async function listSubjectAssignments(): Promise<SubjectAssignment[]> {
       const subject = subjectById.get(row.subject_id);
       const person = staffById.get(row.faculty_id);
       if (!subject || !person) return null;
+      if (departmentCode && subject.department_code !== departmentCode) {
+        return null;
+      }
       return {
         subjectId: row.subject_id,
         subjectCode: subject.code,
@@ -316,16 +327,25 @@ export async function listSubjectAssignments(): Promise<SubjectAssignment[]> {
     );
 }
 
-/** Active staff who can be assigned to teach, for the picker. */
-export async function listAssignableFaculty(): Promise<
+/**
+ * Staff who can be assigned to teach, for the picker — every department, or
+ * just one. A head of department assigns their own people.
+ */
+export async function listAssignableFaculty(
+  departmentCode?: string,
+): Promise<
   Array<{ id: string; fullName: string; email: string; departmentCode: string }>
 > {
   const supabase = createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("faculty")
     .select("id, full_name, email, department_code")
     .order("full_name")
     .limit(500);
+
+  if (departmentCode) query = query.eq("department_code", departmentCode);
+
+  const { data } = await query;
 
   return ((data ?? []) as Array<{
     id: string;

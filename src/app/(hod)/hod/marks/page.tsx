@@ -24,6 +24,9 @@ export default async function HodMarksPage({
       departmentCode={staff.departmentCode}
       subjectId={searchParams.subject}
       section={searchParams.section || undefined}
+      // A HOD may assign the teachers for their own department (0026), and
+      // had the permission with nowhere to exercise it until this screen.
+      canAssignTeachers
     />
   );
 }

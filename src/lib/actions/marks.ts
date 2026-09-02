@@ -16,10 +16,11 @@ import type { ActionState } from "./form-state";
  * indistinguishable from a successful one from the client's side, so failing
  * here is what turns a silent no-op into a message.
  *
- * There is no subject-teacher table yet (a deliberate scope decision, see
- * MANUAL-STEPS), so any member of staff who can see a student may edit their
- * marks. `entered_by` and the audit entries below are the whole of the
- * accountability story until that changes.
+ * Since migration 0026 only the assigned subject teacher, the head of that
+ * subject's department, and administrators may edit marks — a mentor who can
+ * see a student's card may not change it. `entered_by` is pinned by trigger
+ * and every save, release, and assignment writes an audit entry, so who
+ * changed a figure stays answerable.
  */
 
 /**
@@ -228,9 +229,9 @@ export async function releaseComponent(
 
   const supabase = createClient();
 
-  // RLS narrows this to students the caller may write, so a mentor releasing
-  // a component releases it for their own students only — the update simply
-  // does not reach the rest.
+  // RLS narrows this to rows the caller may write, so a section-scoped
+  // teacher releases their own section only — the update simply does not
+  // reach the rest, rather than failing.
   const { error } = await supabase
     .from("student_subject_marks")
     .update({ published_at: withdraw ? null : new Date().toISOString() })
@@ -313,6 +314,8 @@ export async function assignSubjectTeacher(
   });
 
   revalidatePath("/admin/vtu");
+  revalidatePath("/hod/marks");
+  revalidatePath("/faculty/marks");
   return {
     status: "success",
     message: section
@@ -367,6 +370,8 @@ export async function removeSubjectTeacher(
   });
 
   revalidatePath("/admin/vtu");
+  revalidatePath("/hod/marks");
+  revalidatePath("/faculty/marks");
   return {
     status: "success",
     message:
