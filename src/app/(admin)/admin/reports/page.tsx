@@ -10,9 +10,16 @@ const REPORTS = [
   {
     title: "Every student",
     description:
-      "One row per student with academic, contact, and completion columns. Guardian contact is included because you are an administrator.",
+      "One row per student with academic, contact, and completion columns. Guardian contact is included because you are an administrator. Carries three marks summary columns as well.",
     href: "/admin/students/export",
     note: "Add filters on the All students page first to narrow it — the export follows whatever is on screen.",
+  },
+  {
+    title: "Internal marks",
+    description:
+      "One row per student per subject, with a column for each component — 1st IA, 2nd IA, assignment, activity — plus the total recorded. Spans every department.",
+    href: "/admin/marks/export",
+    note: "Includes components faculty have not released yet; they are named in an 'Unreleased components' column so nothing here is mistaken for something a student has seen. The total is a sum of what is recorded, never a CIE.",
   },
   {
     title: "Institution summary",

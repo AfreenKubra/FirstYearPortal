@@ -162,12 +162,12 @@ check; `npm run build` before anything deploy-adjacent.
   the resource catalogue. The live DB also holds ~112 rows of **seeded demo
   marks** against real students; `delete from public.student_subject_marks;`
   clears them.
-- Marks reporting exists for faculty and HOD only: `/faculty/reports` and
-  `/hod/reports` offer a marks CSV (`{base}/marks/export`) plus the details
-  CSV, which now also carries three marks summary columns. **Admin has no
-  marks export** — it gets the summary columns on `/admin/students/export`
-  and nothing more — and `lib/admin/analytics.ts` still knows nothing about
-  marks. No notification is raised when marks are released.
+- Marks reporting exists for all three staff roles: `/faculty/reports`,
+  `/hod/reports`, `/admin/reports` each offer a marks CSV
+  (`{base}/marks/export`) plus the details CSV, which also carries three
+  marks summary columns. All share `lib/marks/export.ts` and are scoped
+  purely by RLS. Still missing: `lib/admin/analytics.ts` knows nothing about
+  marks, and no notification is raised when marks are released.
 - PDF export not built (CSV only). Assessment timer not enforced (display
   only). Section-wise English scoring not built. Event certificates not
   built. Resource-performance-based recommendations not built (needs
