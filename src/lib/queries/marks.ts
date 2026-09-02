@@ -327,6 +327,144 @@ export async function listSubjectAssignments(
     );
 }
 
+// --- Reporting --------------------------------------------------------------
+
+/** One student's marks for one subject, flattened for a CSV row. */
+export type MarksExportRow = {
+  studentId: string;
+  subjectCode: string;
+  subjectName: string;
+  semester: number;
+  /** Keyed by component code; absent means no mark recorded. */
+  byComponent: Map<string, MarkEntry>;
+  scored: number;
+  outOf: number;
+  /** Component labels a student cannot see yet. */
+  unreleased: string[];
+};
+
+/**
+ * Every mark on file for the given students, one row per student-subject.
+ *
+ * Reads are RLS-scoped exactly as the grid is, so a caller gets marks for the
+ * students they may see and nobody else's — the export cannot widen what the
+ * screen shows.
+ *
+ * Unlike the student's own view this keeps unreleased components, because the
+ * staff member reading the report is the one deciding whether to release
+ * them. They are named in `unreleased` rather than silently mixed in, so a
+ * figure in this file is never mistaken for one the student has seen.
+ */
+export async function listMarksForExport(
+  studentIds: string[],
+  components: MarkComponent[],
+): Promise<MarksExportRow[]> {
+  if (studentIds.length === 0) return [];
+
+  const supabase = createClient();
+  const labelByCode = new Map(components.map((c) => [c.code, c.label]));
+
+  // Chunked: a department export can exceed what one `in` filter should carry.
+  const CHUNK = 200;
+  const markRows: MarkRow[] = [];
+  for (let i = 0; i < studentIds.length; i += CHUNK) {
+    const { data } = await supabase
+      .from("student_subject_marks")
+      .select(
+        "student_id, subject_id, component_code, marks, max_marks, remark, published_at",
+      )
+      .in("student_id", studentIds.slice(i, i + CHUNK));
+    markRows.push(...((data ?? []) as MarkRow[]));
+  }
+
+  if (markRows.length === 0) return [];
+
+  const { data: subjectRows } = await supabase
+    .from("vtu_subjects")
+    .select("id, code, name, semester")
+    .in("id", [...new Set(markRows.map((r) => r.subject_id))]);
+
+  const subjectById = new Map(
+    ((subjectRows ?? []) as Array<{
+      id: string;
+      code: string;
+      name: string;
+      semester: number;
+    }>).map((row) => [row.id, row]),
+  );
+
+  const grouped = new Map<string, MarksExportRow>();
+
+  for (const row of markRows) {
+    const subject = subjectById.get(row.subject_id);
+    if (!subject) continue;
+
+    const key = `${row.student_id}:${row.subject_id}`;
+    const existing =
+      grouped.get(key) ??
+      ({
+        studentId: row.student_id,
+        subjectCode: subject.code,
+        subjectName: subject.name,
+        semester: subject.semester,
+        byComponent: new Map<string, MarkEntry>(),
+        scored: 0,
+        outOf: 0,
+        unreleased: [],
+      } satisfies MarksExportRow);
+
+    const entry = mapEntry(row);
+    existing.byComponent.set(entry.componentCode, entry);
+    if (entry.publishedAt === null) {
+      existing.unreleased.push(
+        labelByCode.get(entry.componentCode) ?? entry.componentCode,
+      );
+    }
+    grouped.set(key, existing);
+  }
+
+  // Totals use the same helper the screens do, so a report and a page can
+  // never disagree about a student's sum.
+  for (const row of grouped.values()) {
+    const { scored, outOf } = sumRecorded([...row.byComponent.values()]);
+    row.scored = scored;
+    row.outOf = outOf;
+  }
+
+  return [...grouped.values()].sort(
+    (a, b) => a.subjectCode.localeCompare(b.subjectCode),
+  );
+}
+
+/** Per-student marks totals, for a summary column on the details export. */
+export type MarksSummary = {
+  subjectCount: number;
+  scored: number;
+  outOf: number;
+};
+
+export async function getMarksSummary(
+  studentIds: string[],
+  components: MarkComponent[],
+): Promise<Map<string, MarksSummary>> {
+  const rows = await listMarksForExport(studentIds, components);
+  const summary = new Map<string, MarksSummary>();
+
+  for (const row of rows) {
+    const existing = summary.get(row.studentId) ?? {
+      subjectCount: 0,
+      scored: 0,
+      outOf: 0,
+    };
+    existing.subjectCount += 1;
+    existing.scored = Math.round((existing.scored + row.scored) * 100) / 100;
+    existing.outOf += row.outOf;
+    summary.set(row.studentId, existing);
+  }
+
+  return summary;
+}
+
 /**
  * Staff who can be assigned to teach, for the picker — every department, or
  * just one. A head of department assigns their own people.

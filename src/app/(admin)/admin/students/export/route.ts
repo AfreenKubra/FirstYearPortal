@@ -3,6 +3,7 @@ import { getOwnAdmin } from "@/lib/queries/admin";
 import { listAllMatchingStudents } from "@/lib/queries/directory";
 import { parseFilters } from "@/lib/faculty/filters";
 import { directoryCsvResponse } from "@/lib/directory/export";
+import { getMarksSummary, listMarkComponents } from "@/lib/queries/marks";
 
 /**
  * Student-level export for administrators.
@@ -21,11 +22,20 @@ export async function GET(request: NextRequest) {
   const filters = parseFilters(raw);
   const rows = await listAllMatchingStudents(filters);
 
+  // Three summary columns, so this file can answer "has this student been
+  // marked at all" without opening the dedicated marks export.
+  const components = await listMarkComponents();
+  const marksSummary = await getMarksSummary(
+    rows.map((r) => r.id),
+    components,
+  );
+
   return directoryCsvResponse({
     rows,
     filters,
     generatedBy: `${admin.fullName} (${admin.employeeCode})`,
     scopeNote: "Institution-wide",
     filenamePrefix: "institution-students",
+    marksSummary,
   });
 }

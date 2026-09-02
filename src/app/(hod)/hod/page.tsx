@@ -18,6 +18,7 @@ export default async function HodDashboardPage() {
       heading={`Welcome back, ${firstName}`}
       subheading={`${stats.total} student${stats.total === 1 ? "" : "s"} in your department`}
       basePath="/hod/students"
+      reportsPath="/hod/reports"
       emptyTitle="No students in your department yet"
       emptyDescription="Students appear here as soon as they register against your department and an administrator approves their account."
       stats={stats}

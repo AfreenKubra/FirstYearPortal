@@ -24,6 +24,7 @@ export function StaffDashboard({
   heading,
   subheading,
   basePath,
+  reportsPath,
   emptyTitle,
   emptyDescription,
   stats,
@@ -33,6 +34,8 @@ export function StaffDashboard({
   subheading: string;
   /** Base path of this role's student directory. */
   basePath: string;
+  /** Where this role's reports live, e.g. `/faculty/reports`. */
+  reportsPath: string;
   emptyTitle: string;
   emptyDescription: string;
   stats: FacultyStats;
@@ -50,9 +53,16 @@ export function StaffDashboard({
           </h1>
           <p className="mt-2 text-sm text-ink-muted">{subheading}</p>
         </div>
-        <ButtonLink href={basePath} variant="secondary">
-          Open student directory
-        </ButtonLink>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={basePath} variant="secondary">
+            Open student directory
+          </ButtonLink>
+          {/* Reports are asked for from here — this is the screen somebody is
+              looking at when they decide they need the numbers in a file. */}
+          <ButtonLink href={reportsPath} variant="secondary">
+            Reports
+          </ButtonLink>
+        </div>
       </header>
 
       {stats.total === 0 ? (

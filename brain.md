@@ -36,7 +36,8 @@ src/middleware.ts     security layer 1: session/role/status/profile gate — see
 src/components/ui/          Button, Card, Field, FormStatus, Logo, HeroRoleSwitcher
 src/components/directory/   filters, table, charts, profile view, dashboards — SHARED by faculty/hod/admin
 src/components/marks/       MarksWorkspace + MarksGrid (staff, SHARED by faculty/hod),
-                             StudentMarksTable (student view, rendered on /assessments)
+                             StudentMarksTable (student view, rendered on /assessments),
+                             SubjectTeacherForm (assign teachers; admin/vtu + hod/marks)
 src/components/registration/ auth/ profile/ achievements/ assessments/ events/ resources/ roadmap/ admin/ vtu/
                              — one folder per feature area, form + display components
 
@@ -53,6 +54,7 @@ src/lib/roadmap/      generate.ts (rule-based), ai-generate.ts (Claude-backed), 
                        exam-track.ts, fingerprint.ts, link-providers.ts, links.ts, provider.ts, refresh.ts
 src/lib/directory/    CSV export builder (provenance header, CSV-injection escaping)
 src/lib/marks/        compute.ts — pure: sumRecorded, releasedOnly, pivotToComponents, validateMark
+                       export.ts  — marks CSV builder (one row per student per subject)
 src/lib/profile-completion.ts   pure fn: computes profile_completion_percent
 
 src/config/            roles.ts, branding.ts, residence.ts, states.ts, achievements.ts,
@@ -153,10 +155,19 @@ check; `npm run build` before anything deploy-adjacent.
   deliberate fallback so nothing is ever uneditable, but it means the marks
   subject picker is empty for a plain faculty member until an admin or HOD
   assigns them under **Admin → VTU scheme → Who teaches what**.
-- **`vtu_subjects` is empty on the live DB**, so `/faculty/marks` and
-  `/hod/marks` show "No subjects on file" until an admin enters the scheme
-  under Admin → VTU scheme. Not a bug — same deliberate empty-start as the
-  resource catalogue.
+- **`vtu_subjects` is near-empty on the live DB** (one seeded subject,
+  BMATS101, whose `official_url` is a placeholder needing correction), so the
+  marks screens have little to mark against until an admin enters the real
+  scheme under Admin → VTU scheme. Not a bug — same deliberate empty-start as
+  the resource catalogue. The live DB also holds ~112 rows of **seeded demo
+  marks** against real students; `delete from public.student_subject_marks;`
+  clears them.
+- Marks reporting exists for faculty and HOD only: `/faculty/reports` and
+  `/hod/reports` offer a marks CSV (`{base}/marks/export`) plus the details
+  CSV, which now also carries three marks summary columns. **Admin has no
+  marks export** — it gets the summary columns on `/admin/students/export`
+  and nothing more — and `lib/admin/analytics.ts` still knows nothing about
+  marks. No notification is raised when marks are released.
 - PDF export not built (CSV only). Assessment timer not enforced (display
   only). Section-wise English scoring not built. Event certificates not
   built. Resource-performance-based recommendations not built (needs

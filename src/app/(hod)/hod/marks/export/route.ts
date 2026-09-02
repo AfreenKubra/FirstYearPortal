@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { listAllMatchingStudents } from "@/lib/queries/directory";
 import { parseFilters } from "@/lib/faculty/filters";
-import { directoryCsvResponse } from "@/lib/directory/export";
-import { getMarksSummary, listMarkComponents } from "@/lib/queries/marks";
+import { marksCsvResponse } from "@/lib/marks/export";
+import { listMarksForExport, listMarkComponents } from "@/lib/queries/marks";
 
 export async function GET(request: NextRequest) {
   const staff = await getOwnStaff();
@@ -13,22 +13,21 @@ export async function GET(request: NextRequest) {
 
   const raw = Object.fromEntries(request.nextUrl.searchParams.entries());
   const filters = parseFilters(raw);
-  const rows = await listAllMatchingStudents(filters);
 
-  // Three summary columns, so this file can answer "has this student been
-  // marked at all" without opening the dedicated marks export.
+  const students = await listAllMatchingStudents(filters);
   const components = await listMarkComponents();
-  const marksSummary = await getMarksSummary(
-    rows.map((r) => r.id),
+  const rows = await listMarksForExport(
+    students.map((s) => s.id),
     components,
   );
 
-  return directoryCsvResponse({
+  return marksCsvResponse({
     rows,
+    students,
+    components,
     filters,
     generatedBy: `${staff.fullName} (${staff.employeeCode})`,
     scopeNote: `Department: ${staff.departmentCode}`,
-    filenamePrefix: `${staff.departmentCode.toLowerCase()}-students`,
-    marksSummary,
+    filenamePrefix: `${staff.departmentCode.toLowerCase()}-marks`,
   });
 }
