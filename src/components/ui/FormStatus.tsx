@@ -39,6 +39,12 @@ export function SubmitButton({
       variant={variant}
       size={size}
       className={className}
+      // Without these on the DOM node the browser has no submitter value to
+      // post, so `formData.get(name)` is null however the caller spells it.
+      // That silently broke "Submit for marking" (ExamForm) and the roadmap
+      // approve/reject decision, both of which read exactly that.
+      name={name}
+      value={value}
       disabled={pending}
       aria-busy={pending}
     >
