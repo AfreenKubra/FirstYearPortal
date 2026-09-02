@@ -16,6 +16,7 @@ import type { Role } from "@/config/roles";
 /** Mirrors `public.user_role`; the values live in `config/roles.ts`. */
 export type UserRole = Role;
 export type AccountStatus = "pending" | "active" | "rejected" | "suspended";
+export type MilestoneLinkSource = "catalogue" | "ai_suggested";
 import type { ResidenceType } from "@/config/residence";
 import type { EventKind, RegistrationStatus } from "@/config/events";
 import type { ResourceKind } from "@/config/resources";
@@ -397,6 +398,34 @@ export type Database = {
           position?: number;
         };
         Update: Partial<{ completed_at: string | null }>;
+        Relationships: [];
+      };
+      roadmap_milestone_links: {
+        Row: {
+          id: string;
+          milestone_id: string;
+          link_source: MilestoneLinkSource;
+          resource_id: string | null;
+          title: string;
+          url: string;
+          provider: string | null;
+          kind: ResourceKind;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          milestone_id: string;
+          link_source: MilestoneLinkSource;
+          resource_id?: string | null;
+          title: string;
+          url: string;
+          provider?: string | null;
+          kind?: ResourceKind;
+          position?: number;
+        };
+        // Immutable once written (`guard_milestone_link_immutable`, 0022) —
+        // there is no supported update, matching `roadmap_milestones` above.
+        Update: never;
         Relationships: [];
       };
       resources: {

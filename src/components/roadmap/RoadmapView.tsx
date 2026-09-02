@@ -1,8 +1,9 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { MilestoneToggle } from "./RoadmapActions";
 import { HORIZONS, HORIZON_LABELS, type Horizon } from "@/lib/roadmap/generate";
-import { describeSource } from "@/config/roadmap";
-import type { Roadmap } from "@/lib/queries/roadmaps";
+import { describeSource, AI_SUGGESTED_LINK_NOTICE } from "@/config/roadmap";
+import { VERIFIED_NOTICE } from "@/config/resources";
+import type { Roadmap, MilestoneLink } from "@/lib/queries/roadmaps";
 
 /**
  * A roadmap, laid out by horizon.
@@ -86,6 +87,10 @@ export function RoadmapView({
                       <span className="font-medium">Why: </span>
                       {milestone.rationale}
                     </p>
+
+                    {milestone.links.length > 0 && (
+                      <MilestoneLinkList links={milestone.links} />
+                    )}
                   </li>
                 ))}
               </ol>
@@ -109,5 +114,47 @@ export function RoadmapView({
         </details>
       )}
     </div>
+  );
+}
+
+/**
+ * A milestone's attached links, catalogue links first (already the order
+ * `combineMilestoneLinks` in `src/lib/roadmap/links.ts` produced them in).
+ *
+ * Each link is tagged with where it came from — an admin-verified catalogue
+ * entry, or an AI model's suggestion resolved into a real provider URL — so a
+ * student never has to guess how much to trust one over the other. The
+ * catalogue badge reuses `ResourceCard.tsx`'s verified visual language; the
+ * AI badge is deliberately distinct, and both carry their full notice as a
+ * tooltip.
+ */
+function MilestoneLinkList({ links }: { links: MilestoneLink[] }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {links.map((link) => (
+        <li key={link.id} className="flex flex-wrap items-center gap-1.5 text-xs">
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-900"
+          >
+            {link.title}
+          </a>
+          <span
+            title={link.linkSource === "catalogue" ? VERIFIED_NOTICE : AI_SUGGESTED_LINK_NOTICE}
+            className={[
+              "shrink-0 rounded-md border px-1.5 py-0.5 text-[0.6875rem] font-medium",
+              link.linkSource === "catalogue"
+                ? "border-success/30 bg-success/5 text-success"
+                : "border-indigo-300/50 bg-indigo-50 text-indigo-700",
+            ].join(" ")}
+          >
+            {link.linkSource === "catalogue" ? "From your college" : "Suggested by AI"}
+          </span>
+          {link.provider && <span className="text-ink-faint">{link.provider}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

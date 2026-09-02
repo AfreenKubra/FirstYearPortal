@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Horizon } from "@/lib/roadmap/generate";
 import type { RoadmapSource, RoadmapStatus } from "@/config/roadmap";
+import type { ResourceKind } from "@/config/resources";
 
 /**
  * Roadmap reads (PRD 5.10).
@@ -13,6 +14,18 @@ import type { RoadmapSource, RoadmapStatus } from "@/config/roadmap";
  * survives a mistake in this file.
  */
 
+export type MilestoneLinkSource = "catalogue" | "ai_suggested";
+
+export type MilestoneLink = {
+  id: string;
+  linkSource: MilestoneLinkSource;
+  resourceId: string | null;
+  title: string;
+  url: string;
+  provider: string | null;
+  kind: ResourceKind;
+};
+
 export type Milestone = {
   id: string;
   horizon: Horizon;
@@ -21,6 +34,7 @@ export type Milestone = {
   rationale: string;
   position: number;
   completedAt: string | null;
+  links: MilestoneLink[];
 };
 
 export type Roadmap = {
@@ -66,8 +80,38 @@ async function attachMilestones(rows: RoadmapDbRow[]): Promise<Roadmap[]> {
     )
     .order("position", { ascending: true });
 
+  const milestoneRows = data ?? [];
+  const milestoneIds = milestoneRows.map((m) => m.id);
+
+  // A second, batched query rather than a join: `roadmap_milestone_links`
+  // points at a milestone, not a roadmap, and this keeps the same
+  // one-query-per-table shape as the rest of this function.
+  const linksByMilestone = new Map<string, MilestoneLink[]>();
+  if (milestoneIds.length > 0) {
+    const { data: linkRows } = await supabase
+      .from("roadmap_milestone_links")
+      .select("id, milestone_id, link_source, resource_id, title, url, provider, kind, position")
+      .in("milestone_id", milestoneIds)
+      .order("position", { ascending: true });
+
+    for (const link of linkRows ?? []) {
+      linksByMilestone.set(link.milestone_id, [
+        ...(linksByMilestone.get(link.milestone_id) ?? []),
+        {
+          id: link.id,
+          linkSource: link.link_source,
+          resourceId: link.resource_id,
+          title: link.title,
+          url: link.url,
+          provider: link.provider,
+          kind: link.kind,
+        },
+      ]);
+    }
+  }
+
   const byRoadmap = new Map<string, Milestone[]>();
-  for (const m of data ?? []) {
+  for (const m of milestoneRows) {
     byRoadmap.set(m.roadmap_id, [
       ...(byRoadmap.get(m.roadmap_id) ?? []),
       {
@@ -78,6 +122,7 @@ async function attachMilestones(rows: RoadmapDbRow[]): Promise<Roadmap[]> {
         rationale: m.rationale,
         position: m.position,
         completedAt: m.completed_at,
+        links: linksByMilestone.get(m.id) ?? [],
       },
     ]);
   }

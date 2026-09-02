@@ -112,23 +112,39 @@ would invent students for the numbers nobody was given.
 
 ### 3.1 AI provider for the roadmap
 
-**Status: open. Blocks the AI half of PRD 5.10.**
+**Status: decided 2026-09-02. Claude/Anthropic, via `src/lib/roadmap/ai-generate.ts`.**
 
-The roadmap generator interface exists (`src/lib/roadmap/provider.ts`) and
-every roadmap records `source`, `provider`, and `model`. Only the rule-based
-implementation sits behind it.
+The roadmap generator interface (`src/lib/roadmap/provider.ts`) now has two
+implementations behind it: the original rule-based one, and a Claude-backed
+one. `resolveGenerator()` picks the AI generator whenever `ANTHROPIC_API_KEY`
+is set and non-empty, and the rule-based one otherwise — which is still every
+environment (a fresh clone, CI, a contributor's machine) that has not set one
+up.
 
-What is needed before the AI path can be written:
+What the AI path does and does not see: exactly the same narrow fields the
+rule-based generator already received — department, semester, goals, domains,
+interests, rounded 10th/12th percentages, a bucketed verified-achievement
+count, and any admin-entered VTU subjects. No name, USN, phone, guardian
+contact, or date of birth, matching ARCHITECTURE 6.3's data-minimisation rule
+for this feature.
 
-- **Which provider**, and its data-handling terms for student information.
-  This is a privacy decision, not a technical one — the prompt would carry a
-  student's department, goals, domains, interests, and school marks.
-- **An API key**, as a server-only environment variable. There is no
-  `ANTHROPIC_API_KEY` or equivalent in `.env.local` today.
+The model is forced into a single tool call (`submit_roadmap`,
+`src/lib/roadmap/ai-schema.ts`) rather than free-text parsing, and that
+schema has no `url` field anywhere in it — see 3.4 below for why. A response
+also has to pass the same "invents nothing" checks the rule-based generator's
+own test suite asserts (no URL, no named course/certification/company, no
+salary or placement figure, and every surviving rationale must literally name
+one of the student's own inputs) before any of it is used; anything that
+fails is dropped, and if dropping empties one of the three horizons the whole
+response is rejected. PRD 5.10's fallback requirement is unconditional: an
+unconfigured key, a timeout, a network error, or a response that fails
+validation all land back on the rule-based generator, silently, rather than
+an error page — `generateWithFallback` is what enforces this, and
+`ai-generate.test.ts` proves it for every one of those failure modes.
 
-The rule-based generator is not a placeholder waiting to be replaced. PRD 5.10
-requires a fallback that works when the provider is unavailable, so it has to
-exist regardless — and it works with nothing configured.
+Still open: nobody has reviewed Anthropic's data-handling terms for student
+information formally, beyond the minimisation already described above. That
+review should happen before this is relied on for real students at scale.
 
 ### 3.2 Seeded student passwords
 
@@ -195,6 +211,54 @@ no syllabus content beyond what an administrator entered from the official
 VTU scheme. There are tests asserting the absence of each. That is now the
 only safeguard between the generator and the student, so it matters more than
 it did.
+
+---
+
+## 3.4 AI-suggested links are a deliberate, narrow exception to "invents nothing"
+
+**Status: decided 2026-09-02. Scoped to `roadmap_milestone_links` only — never
+to milestone prose.**
+
+3.3 above says the generator invents nothing, and that guarantee is unchanged
+for a milestone's `title`, `detail`, and `rationale` — the same regex and
+named-entity checks still run against the AI path (3.1), on top of the
+rule-based path's own test suite. What changed is that a roadmap can now also
+carry concrete links to exams, workshops, courses, and certifications, from
+two sources:
+
+- **Catalogue links** (`attachCatalogueLinks`, `src/lib/roadmap/links.ts`) —
+  always a real row from the admin-verified `resources` table (PRD 5.9),
+  matched the same way the resources page ranks the catalogue for a student,
+  narrowed to whatever a specific milestone's own rationale names. This half
+  runs for every roadmap, rule-based or AI, and has no visible effect until an
+  administrator populates `resources`.
+
+- **AI-suggested links** (`attachAiSuggestedLinks`, same file) — the riskier
+  half, chosen deliberately over restricting the model to the catalogue
+  alone, so a roadmap can point somewhere useful even before an administrator
+  has verified anything. The mitigation is structural, not a prompt
+  instruction the model could ignore: `ai-schema.ts`'s `submit_roadmap` tool
+  has no `url` field at all. The model can only supply a `provider` name and
+  a search `keyword`; `src/lib/roadmap/link-providers.ts` deterministically
+  builds the real URL from a small, hardcoded whitelist of real provider
+  domains (NPTEL, SWAYAM, Coursera, edX, Udemy, LinkedIn Learning, AWS
+  Certification, Google Certificates, Microsoft Certifications, HackerRank).
+  An unrecognised provider name resolves to nothing — never a generic
+  fallback link — and is dropped rather than guessed at.
+
+  Government/board exams (GATE and similar) are deliberately **excluded**
+  from the whitelist: their host domain changes across cycles, so a
+  hardcoded template would eventually go stale and point somewhere wrong,
+  which is worse than not linking. Time-bound exam links stay in the
+  admin-verified catalogue, where a person updates them each cycle.
+
+Every link is tagged in the database with `link_source` (`'catalogue'` or
+`'ai_suggested'`) and shown to the student with a distinct badge
+(`RoadmapView.tsx`) carrying `AI_SUGGESTED_LINK_NOTICE`
+(`src/config/roadmap.ts`) — the domain is trustworthy by construction, but the
+specific course or programme is not verified, and the student is told so.
+Caps (2 links per milestone, 6 per roadmap, catalogue links always ordered
+first) keep one enthusiastic response from burying a milestone's rationale.
 
 ---
 

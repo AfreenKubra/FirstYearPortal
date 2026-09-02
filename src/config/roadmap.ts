@@ -61,3 +61,20 @@ export const ROADMAP_REVIEW_NOTICE =
   "A mentor has read this plan and approved it before it reached you. It is " +
   "a suggestion, not an instruction — tell your mentor if something here " +
   "does not fit.";
+
+/**
+ * Shown on every link an AI model suggested rather than one an administrator
+ * verified (PRD 5.10, MANUAL-STEPS.md 3.4).
+ *
+ * The link itself always points at a real, vetted provider domain — the
+ * model never emits a URL, only a provider name and a search keyword that
+ * application code turns into this link (`src/lib/roadmap/link-providers.ts`).
+ * That makes the domain trustworthy. It does not make the specific course,
+ * exam, or certification the model had in mind real, current, or the best
+ * fit — that is still worth a student's own five minutes before they act on
+ * it, which is what this notice says.
+ */
+export const AI_SUGGESTED_LINK_NOTICE =
+  "Suggested by an AI model, not verified by your college. It leads to a " +
+  "real provider's site, but check the specific course or programme " +
+  "yourself before relying on it.";

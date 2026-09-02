@@ -5,8 +5,16 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { getOwnStudent } from "@/lib/queries/student";
+import { listResources } from "@/lib/queries/resources";
 import { generateWithFallback } from "@/lib/roadmap/provider";
 import type { RoadmapInput } from "@/lib/roadmap/generate";
+import {
+  attachAiSuggestedLinks,
+  attachCatalogueLinks,
+  combineMilestoneLinks,
+  type NamedTag,
+  type StudentProfileWithNames,
+} from "@/lib/roadmap/links";
 import { fieldErrorsFrom, type ActionState } from "./form-state";
 
 /**
@@ -18,7 +26,9 @@ import { fieldErrorsFrom, type ActionState } from "./form-state";
  */
 
 /** Gathers what the generator is allowed to see about one student. */
-async function collectInput(studentId: string): Promise<RoadmapInput | null> {
+async function collectInput(
+  studentId: string,
+): Promise<{ input: RoadmapInput; profile: StudentProfileWithNames } | null> {
   const supabase = createClient();
 
   const { data: student } = await supabase
@@ -51,23 +61,48 @@ async function collectInput(studentId: string): Promise<RoadmapInput | null> {
     supabase.from("interests").select("id, name"),
   ]);
 
-  const resolve = (
+  // Named as well as id'd, so `links.ts` can narrow a milestone's catalogue
+  // matches to only the goal/domain/interest its own rationale names — see
+  // the identical comment in `refresh.ts`'s `collectInput`, which this
+  // mirrors for the staff-triggered generation path.
+  const resolveTags = (
     options: Array<{ id: number; name: string }> | null,
     ids: number[],
-  ) => {
+  ): NamedTag[] => {
     const map = new Map((options ?? []).map((o) => [o.id, o.name]));
-    return ids.map((id) => map.get(id)).filter(Boolean) as string[];
+    return ids
+      .map((id) => {
+        const name = map.get(id);
+        return name ? { id, name } : null;
+      })
+      .filter((tag): tag is NamedTag => tag !== null);
   };
 
+  const goalTags = resolveTags(goalNames.data, (goals.data ?? []).map((r) => r.goal_id));
+  const domainTags = resolveTags(domainNames.data, (domains.data ?? []).map((r) => r.domain_id));
+  const interestTags = resolveTags(
+    interestNames.data,
+    (interests.data ?? []).map((r) => r.interest_id),
+  );
+
   return {
-    departmentName: department.data?.name ?? student.department_code,
-    semester: student.semester,
-    goals: resolve(goalNames.data, (goals.data ?? []).map((r) => r.goal_id)),
-    domains: resolve(domainNames.data, (domains.data ?? []).map((r) => r.domain_id)),
-    interests: resolve(interestNames.data, (interests.data ?? []).map((r) => r.interest_id)),
-    tenthPercentage: student.tenth_percentage,
-    twelfthPercentage: student.twelfth_percentage,
-    verifiedAchievements: achievements.count ?? 0,
+    input: {
+      departmentName: department.data?.name ?? student.department_code,
+      semester: student.semester,
+      goals: goalTags.map((t) => t.name),
+      domains: domainTags.map((t) => t.name),
+      interests: interestTags.map((t) => t.name),
+      tenthPercentage: student.tenth_percentage,
+      twelfthPercentage: student.twelfth_percentage,
+      verifiedAchievements: achievements.count ?? 0,
+    },
+    profile: {
+      departmentCode: student.department_code,
+      semester: student.semester,
+      goals: goalTags,
+      domains: domainTags,
+      interests: interestTags,
+    },
   };
 }
 
@@ -102,13 +137,14 @@ export async function generateRoadmapForStudent(
     };
   }
 
-  const input = await collectInput(parsed.data.studentId);
-  if (!input) {
+  const collected = await collectInput(parsed.data.studentId);
+  if (!collected) {
     // RLS makes a student outside the caller's scope simply not exist, so
     // this covers "no such student" and "not yours" without distinguishing
     // them — the same reasoning as the directory.
     return { status: "error", message: "That student is not available to you." };
   }
+  const { input, profile } = collected;
 
   const { roadmap, generator } = await generateWithFallback(input);
   const supabase = createClient();
@@ -136,7 +172,7 @@ export async function generateRoadmapForStudent(
     return { status: "error", message: "Could not generate that roadmap." };
   }
 
-  const { error: milestoneError } = await supabase
+  const { data: insertedMilestones, error: milestoneError } = await supabase
     .from("roadmap_milestones")
     .insert(
       roadmap.milestones.map((m, index) => ({
@@ -147,13 +183,42 @@ export async function generateRoadmapForStudent(
         rationale: m.rationale,
         position: index,
       })),
-    );
+    )
+    .select("id, position");
 
-  if (milestoneError) {
+  if (milestoneError || !insertedMilestones) {
     // A roadmap with no milestones is not a roadmap. Remove the shell rather
     // than leave an empty plan in the review queue.
     await supabase.from("student_roadmaps").delete().eq("id", created.id);
     return { status: "error", message: "Could not save the milestones." };
+  }
+
+  // Links are attached best-effort, exactly as in `refresh.ts` — the
+  // catalogue half runs regardless of which generator produced the
+  // milestones, the AI-suggested half only when the AI generator proposed
+  // some. The RLS insert policy on `roadmap_milestone_links` permits staff
+  // via `can_faculty_view_student`, so the caller's own authenticated client
+  // is enough here (no admin client needed on this path).
+  const catalogueResources = await listResources();
+  const catalogueLinks = attachCatalogueLinks(roadmap.milestones, catalogueResources, profile);
+  const aiLinks = attachAiSuggestedLinks(roadmap.milestones.length, roadmap.linkSuggestions ?? []);
+  const linksByPosition = combineMilestoneLinks(catalogueLinks, aiLinks);
+
+  const linkRows = insertedMilestones.flatMap((milestone) =>
+    (linksByPosition[milestone.position] ?? []).map((link, index) => ({
+      milestone_id: milestone.id,
+      link_source: link.linkSource,
+      resource_id: link.resourceId,
+      title: link.title,
+      url: link.url,
+      provider: link.provider,
+      kind: link.kind,
+      position: index,
+    })),
+  );
+
+  if (linkRows.length > 0) {
+    await supabase.from("roadmap_milestone_links").insert(linkRows);
   }
 
   revalidatePath("/faculty/roadmaps");

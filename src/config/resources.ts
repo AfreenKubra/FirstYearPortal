@@ -9,6 +9,8 @@ export const RESOURCE_KINDS = [
   { value: "question_paper", label: "Question paper" },
   { value: "course", label: "Course" },
   { value: "certification", label: "Certification" },
+  { value: "exam", label: "Exam" },
+  { value: "workshop", label: "Workshop" },
   { value: "book", label: "Book" },
   { value: "video", label: "Video" },
   { value: "tool", label: "Tool" },

@@ -3,8 +3,16 @@ import "server-only";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getOwnStudent } from "@/lib/queries/student";
 import { getSubjectsFor } from "@/lib/queries/vtu";
+import { listResources } from "@/lib/queries/resources";
 import { generateWithFallback } from "./provider";
 import { fingerprintInputs, isStale } from "./fingerprint";
+import {
+  attachAiSuggestedLinks,
+  attachCatalogueLinks,
+  combineMilestoneLinks,
+  type NamedTag,
+  type StudentProfileWithNames,
+} from "./links";
 import type { RoadmapInput } from "./generate";
 
 /**
@@ -34,7 +42,7 @@ import type { RoadmapInput } from "./generate";
 async function collectInput(
   studentId: string,
   departmentCode: string,
-): Promise<RoadmapInput | null> {
+): Promise<{ input: RoadmapInput; profile: StudentProfileWithNames } | null> {
   const supabase = createClient();
 
   const { data: student } = await supabase
@@ -64,25 +72,49 @@ async function collectInput(
     getSubjectsFor(departmentCode, student.semester),
   ]);
 
-  const resolve = (
+  // Named as well as id'd, so `links.ts` can narrow a milestone's catalogue
+  // matches to only the goal/domain/interest its own rationale names, not
+  // just resolve display strings for the model's prompt.
+  const resolveTags = (
     options: Array<{ id: number; name: string }> | null,
     ids: number[],
-  ) => {
+  ): NamedTag[] => {
     const map = new Map((options ?? []).map((o) => [o.id, o.name]));
-    return ids.map((id) => map.get(id)).filter(Boolean) as string[];
+    return ids
+      .map((id) => {
+        const name = map.get(id);
+        return name ? { id, name } : null;
+      })
+      .filter((tag): tag is NamedTag => tag !== null);
   };
 
+  const goalTags = resolveTags(goalNames.data, (goals.data ?? []).map((r) => r.goal_id));
+  const domainTags = resolveTags(domainNames.data, (domains.data ?? []).map((r) => r.domain_id));
+  const interestTags = resolveTags(
+    interestNames.data,
+    (interests.data ?? []).map((r) => r.interest_id),
+  );
+
   return {
-    departmentName: department.data?.name ?? departmentCode,
-    semester: student.semester,
-    goals: resolve(goalNames.data, (goals.data ?? []).map((r) => r.goal_id)),
-    domains: resolve(domainNames.data, (domains.data ?? []).map((r) => r.domain_id)),
-    interests: resolve(interestNames.data, (interests.data ?? []).map((r) => r.interest_id)),
-    tenthPercentage: student.tenth_percentage,
-    twelfthPercentage: student.twelfth_percentage,
-    verifiedAchievements: achievements.count ?? 0,
-    vtuSubjects: subjects.map((s) => `${s.name} (${s.code})`),
-    vtuSchemeUrl: subjects[0]?.officialUrl ?? null,
+    input: {
+      departmentName: department.data?.name ?? departmentCode,
+      semester: student.semester,
+      goals: goalTags.map((t) => t.name),
+      domains: domainTags.map((t) => t.name),
+      interests: interestTags.map((t) => t.name),
+      tenthPercentage: student.tenth_percentage,
+      twelfthPercentage: student.twelfth_percentage,
+      verifiedAchievements: achievements.count ?? 0,
+      vtuSubjects: subjects.map((s) => `${s.name} (${s.code})`),
+      vtuSchemeUrl: subjects[0]?.officialUrl ?? null,
+    },
+    profile: {
+      departmentCode,
+      semester: student.semester,
+      goals: goalTags,
+      domains: domainTags,
+      interests: interestTags,
+    },
   };
 }
 
@@ -111,8 +143,9 @@ export async function refreshOwnRoadmap(): Promise<RefreshOutcome> {
     .limit(1)
     .maybeSingle();
 
-  const input = await collectInput(student.id, student.departmentCode);
-  if (!input) return { changed: false, reason: "no_student" };
+  const collected = await collectInput(student.id, student.departmentCode);
+  if (!collected) return { changed: false, reason: "no_student" };
+  const { input, profile } = collected;
 
   if (existing && !isStale(existing.inputs_fingerprint, input)) {
     return { changed: false, reason: "current" };
@@ -161,7 +194,7 @@ export async function refreshOwnRoadmap(): Promise<RefreshOutcome> {
     return { changed: false, reason: "current" };
   }
 
-  const { error: milestoneError } = await service
+  const { data: insertedMilestones, error: milestoneError } = await service
     .from("roadmap_milestones")
     .insert(
       roadmap.milestones.map((m, index) => ({
@@ -172,9 +205,10 @@ export async function refreshOwnRoadmap(): Promise<RefreshOutcome> {
         rationale: m.rationale,
         position: index,
       })),
-    );
+    )
+    .select("id, position");
 
-  if (milestoneError) {
+  if (milestoneError || !insertedMilestones) {
     // A roadmap with no milestones is not a roadmap.
     await service.from("student_roadmaps").delete().eq("id", created.id);
     if (existing) {
@@ -184,6 +218,34 @@ export async function refreshOwnRoadmap(): Promise<RefreshOutcome> {
         .eq("id", existing.id);
     }
     return { changed: false, reason: "current" };
+  }
+
+  // Links are attached best-effort, from both sources (PRD 5.9/5.10): the
+  // admin-verified catalogue always runs, regardless of which generator
+  // produced the milestones; AI-suggested links only exist when the AI
+  // generator actually ran and proposed some. A roadmap is still a valid
+  // roadmap with no links, so a failure here never rolls back the insert
+  // above — it just leaves that milestone without a link this time.
+  const catalogueResources = await listResources();
+  const catalogueLinks = attachCatalogueLinks(roadmap.milestones, catalogueResources, profile);
+  const aiLinks = attachAiSuggestedLinks(roadmap.milestones.length, roadmap.linkSuggestions ?? []);
+  const linksByPosition = combineMilestoneLinks(catalogueLinks, aiLinks);
+
+  const linkRows = insertedMilestones.flatMap((milestone) =>
+    (linksByPosition[milestone.position] ?? []).map((link, index) => ({
+      milestone_id: milestone.id,
+      link_source: link.linkSource,
+      resource_id: link.resourceId,
+      title: link.title,
+      url: link.url,
+      provider: link.provider,
+      kind: link.kind,
+      position: index,
+    })),
+  );
+
+  if (linkRows.length > 0) {
+    await service.from("roadmap_milestone_links").insert(linkRows);
   }
 
   return {

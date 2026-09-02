@@ -20,6 +20,7 @@
     "seed:students:dry": "node scripts/seed-students.mjs --dry"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.47.10",
     "next": "14.2.21",

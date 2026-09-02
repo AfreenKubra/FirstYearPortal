@@ -102,6 +102,26 @@ const SIGNATURES = [
   ["0015_resources.sql", `select to_regclass('public.resources') is not null`],
   ["0016_roadmaps.sql", `select to_regclass('public.student_roadmaps') is not null`],
   ["0017_notifications.sql", `select to_regclass('public.notifications') is not null`],
+  [
+    "0018_roadmap_auto_status.sql",
+    `select exists (select 1 from pg_enum e join pg_type t on t.oid=e.enumtypid
+       where t.typname='roadmap_status' and e.enumlabel='auto')`,
+  ],
+  ["0019_vtu_scheme_and_live_roadmaps.sql", `select to_regclass('public.vtu_subjects') is not null`],
+  [
+    "0020_trusted_server_writes.sql",
+    `select exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname='is_trusted_server')`,
+  ],
+  [
+    "0021_resource_kind_exam_workshop.sql",
+    `select exists (select 1 from pg_enum e join pg_type t on t.oid=e.enumtypid
+       where t.typname='resource_kind' and e.enumlabel='exam')`,
+  ],
+  [
+    "0022_roadmap_milestone_links.sql",
+    `select to_regclass('public.roadmap_milestone_links') is not null`,
+  ],
 ];
 
 async function main() {
