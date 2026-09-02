@@ -419,3 +419,50 @@ Deploying makes real student data reachable from the public internet: names,
 marks, and guardian phone numbers for 30 first-years. Decide deliberately
 whether this deployment should point at the production Supabase project or a
 separate one holding demo data.
+
+---
+
+## 10. A psychometric visibility leak, found and fixed
+
+**Status: fixed 2026-09-03 by `0030_psychometric_visibility_fix.sql`.
+Recorded because it was a live breach of a stated product requirement, and
+because the mistake behind it is easy to make again.**
+
+PRD 5.7 says a psychometric result reaches the student and their assigned
+mentor and nobody else, and calls that a requirement rather than optional
+copy. From 0013 until 0030 that was not true: a faculty member assigned to a
+student but deliberately **not** their mentor could read that student's
+psychometric attempt, as long as they had not authored the paper — which is
+the ordinary case.
+
+The policy looked right. It said, in effect, "unless this assessment is
+psychometric, or you are the mentor". The failure was in how RLS evaluates a
+subquery:
+
+> A subquery inside a policy runs with the **caller's** privileges, so it is
+> filtered by RLS on the table it reads.
+
+`assessments` is visible only to its author, that department's head, an
+administrator, and targeted students. For anybody else the inner
+`select 1 from assessments where kind = 'psychometric'` returned nothing, so
+`exists` was false, `not exists` was **true**, and the psychometric branch was
+skipped entirely.
+
+**Negation is what made it dangerous.** `exists` over a table the caller
+cannot read fails closed — it denies. `not exists` fails open — it grants. The
+same dependency in `student_answers` used a join and so failed closed, which
+was safe but wrong in the other direction: a genuine mentor who could not read
+the assessment row was refused answers they were entitled to. Both now call
+`is_psychometric_assessment()`, a `security definer` function that is not
+subject to RLS.
+
+**How it was found, and the lesson about the test.** The first version of the
+test used a staff member with no relationship to the student at all. It
+passed — and would have passed with the psychometric branch deleted, because
+`can_faculty_view_student()` already refuses such a caller before the branch
+is reached. Giving the fixture an assignment with `is_mentor = false` is what
+made the assertion discriminate, and it failed on the first run. A test that
+cannot fail for the reason it names is not evidence.
+
+The rule to carry forward is in `brain.md`: never put a bare subquery over
+another RLS-protected table inside a policy.

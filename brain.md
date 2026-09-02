@@ -63,7 +63,7 @@ src/config/            roles.ts, branding.ts, residence.ts, states.ts, achieveme
                        marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0029, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0030, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```
@@ -78,6 +78,11 @@ them and needs no database. The RLS suite is the exception — it lives in
 1. **Three independent security layers** — middleware → Server Action →
    Postgres RLS. Adding a route or mutation means updating the relevant ones
    together; RLS is the backstop that holds even if the other two are missed.
+   **Never put a bare subquery over another RLS-protected table inside a
+   policy.** It runs with the *caller's* privileges, so it is filtered by that
+   table's own RLS: `exists(...)` then fails closed, and `not exists(...)`
+   fails **open**. That is how the psychometric guard leaked until 0030 —
+   use a `security definer` helper (`is_psychometric_assessment()`) instead.
 2. **`src/lib/actions/*`** never trusts a client-supplied user/student id —
    every action re-derives the caller from `auth.getUser()` first, then
    scopes the write to that caller's own row. Copy this pattern for new
@@ -155,11 +160,11 @@ check; `npm run build` before anything deploy-adjacent.
 
 ## Current known gaps (see MANUAL-STEPS.md for full detail/why)
 
-- RLS is covered by `npm run test:rls` (36 specs, `tests/rls/`, own vitest
+- RLS is covered by `npm run test:rls` (58 specs, `tests/rls/`, own vitest
   config, real DB, fixtures torn down per run): marks, subject_faculty,
-  notifications, students, achievements, audit log, admin allow-list, and the
-  rate limiter. **Still unverified** — events, assessment attempts/answers,
-  resources, roadmaps. No integration or e2e tests at all.
+  notifications, students, achievements, audit log, admin allow-list, the
+  rate limiter, events, assessments, resources, and roadmaps. No integration
+  or e2e tests at all.
 - Internal marks editing is restricted to the assigned subject teacher, the
   HOD of that department, and admins (migration 0026, `subject_faculty`).
   A subject with **no** teacher assigned falls back to HOD/admin only — a
