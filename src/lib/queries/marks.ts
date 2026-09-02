@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { pivotToComponents, releasedOnly, sumRecorded } from "@/lib/marks/compute";
 import type { MarkComponent, MarkEntry } from "@/config/marks";
+import type { AnalyticsMarkRow } from "@/lib/admin/analytics";
 
 /**
  * Internal marks reads (migration 0025).
@@ -434,6 +435,55 @@ export async function listMarksForExport(
   return [...grouped.values()].sort(
     (a, b) => a.subjectCode.localeCompare(b.subjectCode),
   );
+}
+
+/**
+ * Every mark the caller may read, flattened with the student's department,
+ * for the institution analytics (PRD 5.6).
+ *
+ * RLS-scoped like everything else here, so an administrator gets the
+ * institution and nobody else would get more than their own scope from the
+ * same call. Returns the raw rows rather than aggregates: the arithmetic
+ * lives in `admin/analytics.ts` where it can be unit-tested against fixtures.
+ */
+export async function listMarkRowsForAnalytics(
+  studentDepartments: Map<string, string>,
+): Promise<AnalyticsMarkRow[]> {
+  const studentIds = [...studentDepartments.keys()];
+  if (studentIds.length === 0) return [];
+
+  const supabase = createClient();
+  const CHUNK = 200;
+  const rows: AnalyticsMarkRow[] = [];
+
+  for (let i = 0; i < studentIds.length; i += CHUNK) {
+    const { data } = await supabase
+      .from("student_subject_marks")
+      .select("student_id, component_code, marks, max_marks, published_at")
+      .in("student_id", studentIds.slice(i, i + CHUNK));
+
+    for (const row of (data ?? []) as Array<{
+      student_id: string;
+      component_code: string;
+      marks: number | string | null;
+      max_marks: number;
+      published_at: string | null;
+    }>) {
+      const departmentCode = studentDepartments.get(row.student_id);
+      if (!departmentCode) continue;
+
+      rows.push({
+        studentId: row.student_id,
+        departmentCode,
+        componentCode: row.component_code,
+        marks: toNumber(row.marks),
+        maxMarks: row.max_marks,
+        released: row.published_at !== null,
+      });
+    }
+  }
+
+  return rows;
 }
 
 /** Per-student marks totals, for a summary column on the details export. */

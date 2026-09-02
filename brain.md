@@ -123,6 +123,10 @@ a top-level `tests/` tree). Run all of them with `npm test`.
     Same family of rule as the roadmap's "invents nothing". Also: a blank mark
     is *not* a zero — `sumRecorded()` skips unmarked components rather than
     counting them, and the UI renders `—`. Don't "helpfully" default to 0.
+    The same rule governs analytics: `summariseMarks()` normalises each
+    component against its own max (pooling a /20 IA with a /10 activity is
+    meaningless) and skips unmarked rows, so an unmarked cohort never reads
+    as a failing one.
 12. **Marks components are a table, not an enum** (`mark_components`), so
     adding IA3 is a row. Deliberate — migrations 0010 and 0018 exist only
     because Postgres won't let a new enum value be used in the transaction
@@ -166,8 +170,9 @@ check; `npm run build` before anything deploy-adjacent.
   `/hod/reports`, `/admin/reports` each offer a marks CSV
   (`{base}/marks/export`) plus the details CSV, which also carries three
   marks summary columns. All share `lib/marks/export.ts` and are scoped
-  purely by RLS. Still missing: `lib/admin/analytics.ts` knows nothing about
-  marks, and no notification is raised when marks are released.
+  purely by RLS. Marks coverage is on the admin overview too
+  (`summariseMarks` in `lib/admin/analytics.ts`). Still missing: no
+  notification is raised when marks are released.
 - PDF export not built (CSV only). Assessment timer not enforced (display
   only). Section-wise English scoring not built. Event certificates not
   built. Resource-performance-based recommendations not built (needs

@@ -4,10 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import {
   summariseDepartments,
   summariseInstitution,
+  summariseMarks,
   type AnalyticsStudent,
   type DepartmentSummary,
   type InstitutionStats,
+  type MarksAnalytics,
 } from "@/lib/admin/analytics";
+import { listMarkComponents, listMarkRowsForAnalytics } from "./marks";
+import type { MarkComponent } from "@/config/marks";
 
 export type AdminRecord = {
   id: string;
@@ -98,6 +102,9 @@ export type AdminOverview = {
   departments: DepartmentSummary[];
   facultyCount: number;
   pendingAccounts: number;
+  /** Coverage of internal marks (migration 0025), never a CIE. */
+  marks: MarksAnalytics;
+  markComponents: MarkComponent[];
 };
 
 export async function getAdminOverview(): Promise<AdminOverview> {
@@ -115,11 +122,20 @@ export async function getAdminOverview(): Promise<AdminOverview> {
 
   const departments = departmentRows.data ?? [];
 
+  // Marks are fetched after the students, because the rows have to be paired
+  // with a department and `student_directory` is where that lives.
+  const markComponents = await listMarkComponents();
+  const markRows = await listMarkRowsForAnalytics(
+    new Map(students.map((s) => [s.id, s.departmentCode])),
+  );
+
   return {
     institution: summariseInstitution(students, (row) => row.state),
     departments: summariseDepartments(students, departments),
     facultyCount: facultyCount.count ?? 0,
     pendingAccounts: pendingCount.count ?? 0,
+    marks: summariseMarks(markRows, markComponents),
+    markComponents,
   };
 }
 
