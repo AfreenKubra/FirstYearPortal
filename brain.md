@@ -63,7 +63,7 @@ src/config/            roles.ts, branding.ts, residence.ts, states.ts, achieveme
                        marks.ts
                        — single source of truth, imported by UI + middleware + actions together
 
-supabase/migrations/   0001..0030, strictly ordered SQL, see "Migrations" below
+supabase/migrations/   0001..0031, strictly ordered SQL, see "Migrations" below
 scripts/               migrate.mjs, check-schema.mjs, backfill-migrations.mjs,
                        sync-admins.mjs, seed-students.mjs, seed-resources.mjs
 ```

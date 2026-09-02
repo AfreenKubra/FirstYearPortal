@@ -358,6 +358,28 @@ describe.skipIf(!RLS_ENV_READY)("feature-module RLS", () => {
       expect(rows).toHaveLength(0);
     });
 
+    // 0031. Not exploitable before it — Postgres applies SELECT policies to
+    // the rows an UPDATE must locate, so 0030's SELECT guard already refused
+    // this. Pinned anyway because that protection was incidental: a broader
+    // read policy added later would have removed it silently.
+    it("does not let that assigned non-mentor write a psychometric attempt", async () => {
+      const { rows } = await asUser(
+        client,
+        viewer.userId,
+        `update public.assessment_attempts set percentage = 1
+         where id = $1 returning percentage`,
+        [psychAttemptId],
+      );
+      expect(rows).toHaveLength(0);
+
+      const { data } = await db
+        .from("assessment_attempts")
+        .select("percentage")
+        .eq("id", psychAttemptId)
+        .single();
+      expect(Number(data?.percentage)).toBe(61);
+    });
+
     it("still lets the assigned mentor read it, which is who it is for", async () => {
       const { rows } = await asUser(
         client,
