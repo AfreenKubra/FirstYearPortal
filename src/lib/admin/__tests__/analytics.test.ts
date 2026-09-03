@@ -6,7 +6,9 @@ import {
   summariseDepartments,
   summariseInstitution,
   tallyBy,
+  summariseMarks,
   type AnalyticsStudent,
+  type AnalyticsMarkRow,
 } from "../analytics";
 
 function student(overrides: Partial<AnalyticsStudent> = {}): AnalyticsStudent {
@@ -222,5 +224,116 @@ describe("describeAssignment", () => {
         isMentor: true,
       }),
     ).toBe("Mentor — AIML · Semester 2 · Section B");
+  });
+});
+
+describe("summariseMarks", () => {
+  const COMPONENTS = [
+    { code: "ia1", label: "1st IA", maxMarks: 20 },
+    { code: "ia2", label: "2nd IA", maxMarks: 20 },
+    { code: "activity", label: "Activity", maxMarks: 10 },
+  ];
+
+  function mark(over: Partial<AnalyticsMarkRow> = {}): AnalyticsMarkRow {
+    return {
+      studentId: "s1",
+      departmentCode: "AIML",
+      componentCode: "ia1",
+      marks: 10,
+      maxMarks: 20,
+      released: true,
+      ...over,
+    };
+  }
+
+  it("counts recorded and released entries", () => {
+    const result = summariseMarks(
+      [
+        mark({ marks: 10, released: true }),
+        mark({ componentCode: "ia2", marks: 15, released: false }),
+      ],
+      COMPONENTS,
+    );
+
+    expect(result.entriesRecorded).toBe(2);
+    expect(result.entriesReleased).toBe(1);
+  });
+
+  // The rule that matters most: an unmarked cohort is not a failing one.
+  it("skips unmarked entries rather than counting them as zero", () => {
+    const result = summariseMarks(
+      [
+        mark({ marks: 20, maxMarks: 20 }),
+        mark({ studentId: "s2", marks: null }),
+      ],
+      COMPONENTS,
+    );
+
+    expect(result.entriesRecorded).toBe(1);
+    expect(result.byComponent[0].averagePercent).toBe(100);
+    expect(result.studentsWithMarks).toBe(1);
+  });
+
+  // Pooling a 20-mark IA with a 10-mark activity would be meaningless, so
+  // each is normalised against its own maximum.
+  it("averages each component against its own maximum", () => {
+    const result = summariseMarks(
+      [
+        mark({ componentCode: "ia1", marks: 10, maxMarks: 20 }),
+        mark({ componentCode: "activity", marks: 10, maxMarks: 10 }),
+      ],
+      COMPONENTS,
+    );
+
+    const ia1 = result.byComponent.find((c) => c.code === "ia1")!;
+    const activity = result.byComponent.find((c) => c.code === "activity")!;
+
+    expect(ia1.averagePercent).toBe(50);
+    expect(activity.averagePercent).toBe(100);
+  });
+
+  it("normalises against the row's own maximum, not the component's current one", () => {
+    // A component whose maximum was raised after marking must not re-scale
+    // the figures already recorded against the old one.
+    const result = summariseMarks(
+      [mark({ componentCode: "ia1", marks: 5, maxMarks: 10 })],
+      [{ code: "ia1", label: "1st IA", maxMarks: 20 }],
+    );
+
+    expect(result.byComponent[0].averagePercent).toBe(50);
+  });
+
+  it("reports a component with nothing recorded as null, not zero", () => {
+    const result = summariseMarks([mark({ componentCode: "ia1" })], COMPONENTS);
+    const ia2 = result.byComponent.find((c) => c.code === "ia2")!;
+
+    expect(ia2.recorded).toBe(0);
+    expect(ia2.averagePercent).toBeNull();
+  });
+
+  it("counts a student once per department however many components they carry", () => {
+    const result = summariseMarks(
+      [
+        mark({ studentId: "s1", componentCode: "ia1" }),
+        mark({ studentId: "s1", componentCode: "ia2" }),
+        mark({ studentId: "s2", componentCode: "ia1", departmentCode: "CSE" }),
+      ],
+      COMPONENTS,
+    );
+
+    expect(result.studentsWithMarks).toBe(2);
+    expect(result.markedByDepartment).toEqual([
+      { label: "AIML", count: 1 },
+      { label: "CSE", count: 1 },
+    ]);
+  });
+
+  it("returns an empty summary for no marks at all", () => {
+    const result = summariseMarks([], COMPONENTS);
+
+    expect(result.studentsWithMarks).toBe(0);
+    expect(result.entriesRecorded).toBe(0);
+    expect(result.markedByDepartment).toEqual([]);
+    expect(result.byComponent.every((c) => c.averagePercent === null)).toBe(true);
   });
 });

@@ -168,6 +168,53 @@ const CHECKS = [
     label: "service-role exemption on the write guards",
     probe: () => functionExists("is_trusted_server"),
   },
+  {
+    migration: "0025_internal_marks.sql",
+    label: "internal marks (IA, assignment, activity)",
+    probe: () => tableExists("student_subject_marks"),
+  },
+  {
+    migration: "0026_subject_faculty.sql",
+    label: "subject teachers, and marks restricted to them",
+    probe: () => tableExists("subject_faculty"),
+  },
+  {
+    migration: "0027_marks_released_kind.sql",
+    label: "'marks_released' value on notification_kind",
+    probe: async () => {
+      // Filtering on an enum value Postgres does not know is an error, so a
+      // clean query proves the value exists — same trick as the 'hod' and
+      // 'auto' probes above.
+      const { error } = await db
+        .from("notifications")
+        .select("id")
+        .eq("kind", "marks_released")
+        .limit(1);
+      return !error;
+    },
+  },
+  {
+    migration: "0029_auth_rate_limits.sql",
+    label: "rate limiting on the authentication endpoints",
+    probe: async () => {
+      // The table is deliberately unreadable even to the service role's
+      // PostgREST view (RLS on, no policies), so probe the function instead —
+      // this one IS callable, unlike a trigger function.
+      const { error } = await db.rpc("consume_rate_limit", {
+        p_bucket: "schema-probe",
+        p_limit: 1000000,
+        p_window_seconds: 1,
+      });
+      return !error || error.code !== "PGRST202";
+    },
+  },
+  // 0028_marks_released_notification.sql has no probe on purpose. It creates
+  // only a trigger and its function, and PostgREST does not expose trigger
+  // functions in its schema cache — `functionExists` returns PGRST202 for one
+  // whether or not it is there, so a probe would report MISSING for an
+  // applied migration. That is worse than no probe: it sends somebody to
+  // re-run a migration that already ran. It is listed as unchecked below
+  // instead, which is the honest answer.
 ];
 
 console.log(`\nChecking ${url}\n`);

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { describeFilters, toCsv, type StudentFilters } from "@/lib/faculty/filters";
 import { residenceLabel } from "@/config/residence";
+import { SUM_LABEL } from "@/config/marks";
 import type { DirectoryRow } from "@/lib/queries/directory";
+import type { MarksSummary } from "@/lib/queries/marks";
 
 /**
  * CSV export of a filtered directory view (PRD 5.5, 5.11).
@@ -22,6 +24,7 @@ export function directoryCsvResponse({
   generatedBy,
   scopeNote,
   filenamePrefix = "students",
+  marksSummary,
 }: {
   rows: DirectoryRow[];
   filters: StudentFilters;
@@ -30,6 +33,17 @@ export function directoryCsvResponse({
   /** One line stating whose students these are, e.g. "Department: AIML". */
   scopeNote: string;
   filenamePrefix?: string;
+  /**
+   * Per-student marks totals, when the caller has them.
+   *
+   * A summary only. Marks are per subject and per component, so a full
+   * breakdown cannot fit a one-row-per-student file without either
+   * duplicating every student or inventing an average across subjects that
+   * carry different weights. The dedicated marks export is the breakdown;
+   * these three columns exist so this file can answer "has this student been
+   * marked at all" without opening it.
+   */
+  marksSummary?: Map<string, MarksSummary>;
 }): NextResponse {
   const generatedAt = new Date().toISOString();
   const applied = describeFilters(filters);
@@ -63,6 +77,9 @@ export function directoryCsvResponse({
       "Profile completion %",
       "Guardian name",
       "Guardian phone",
+      ...(marksSummary
+        ? ["Subjects marked", SUM_LABEL, "Out of"]
+        : []),
     ],
     ...rows.map((student) => [
       student.fullName,
@@ -82,6 +99,17 @@ export function directoryCsvResponse({
       student.completionPercent,
       student.guardianVisible ? student.guardianName : "(not permitted)",
       student.guardianVisible ? student.guardianPhone : "(not permitted)",
+      // Blank rather than 0 for a student with nothing marked, for the same
+      // reason the screens use an em dash: "not marked" and "scored nothing"
+      // must not look identical in a file somebody makes decisions from.
+      ...(marksSummary
+        ? (() => {
+            const summary = marksSummary.get(student.id);
+            return summary
+              ? [summary.subjectCount, summary.scored, summary.outOf]
+              : ["", "", ""];
+          })()
+        : []),
     ]),
   ];
 

@@ -171,6 +171,107 @@ export function summariseInstitution<T extends AnalyticsStudent>(
   };
 }
 
+// --- Internal marks (migration 0025) ----------------------------------------
+
+/** One recorded mark, flattened with the student's department. */
+export type AnalyticsMarkRow = {
+  studentId: string;
+  departmentCode: string;
+  componentCode: string;
+  marks: number | null;
+  maxMarks: number;
+  released: boolean;
+};
+
+export type ComponentSummary = {
+  code: string;
+  label: string;
+  maxMarks: number;
+  /** Rows carrying a mark. */
+  recorded: number;
+  /** Of those, how many students can see. */
+  released: number;
+  /**
+   * Mean of the recorded marks as a percentage of that component's maximum.
+   *
+   * A percentage rather than a raw mean because the components have different
+   * maxima — a raw "average mark" pooled across a 20-mark IA and a 10-mark
+   * activity is a number with no meaning. Null when nothing is recorded.
+   */
+  averagePercent: number | null;
+};
+
+export type MarksAnalytics = {
+  studentsWithMarks: number;
+  entriesRecorded: number;
+  entriesReleased: number;
+  byComponent: ComponentSummary[];
+  /** Students carrying at least one mark, per department. */
+  markedByDepartment: Slice[];
+};
+
+/**
+ * Institution-wide marks coverage (PRD 5.6 applied to migration 0025).
+ *
+ * What this deliberately does NOT produce is a single "average marks" figure
+ * or anything resembling a CIE. VTU's formula varies by scheme and subject
+ * kind, and pooling components with different maxima would invent an
+ * authoritative-looking number nobody entered — the same mistake the roadmap
+ * generator and the CSV exports are built to avoid. The honest questions at
+ * this level are how much marking has happened, how much of it students can
+ * see, and how each component is landing relative to its own maximum.
+ *
+ * Unmarked entries are skipped rather than counted as zero, matching
+ * `averageOf` above and the blank-is-not-a-zero rule the screens follow: an
+ * unmarked cohort must not read as a failing one.
+ */
+export function summariseMarks(
+  rows: AnalyticsMarkRow[],
+  components: Array<{ code: string; label: string; maxMarks: number }>,
+): MarksAnalytics {
+  const recorded = rows.filter((r) => r.marks !== null);
+
+  const byComponent = components.map((component) => {
+    const mine = recorded.filter((r) => r.componentCode === component.code);
+
+    return {
+      code: component.code,
+      label: component.label,
+      maxMarks: component.maxMarks,
+      recorded: mine.length,
+      released: mine.filter((r) => r.released).length,
+      // Normalised per row against that row's own snapshotted maximum, not
+      // the component's current one — a component whose maximum was changed
+      // after marking would otherwise re-scale old figures.
+      averagePercent: averageOf(
+        mine.map((r) => (r.maxMarks > 0 ? (r.marks! / r.maxMarks) * 100 : null)),
+      ),
+    };
+  });
+
+  const studentsWithMarks = new Set(recorded.map((r) => r.studentId));
+
+  // One entry per student, not per mark, so a student with four components
+  // does not count four times toward their department.
+  const perStudentDepartment = new Map<string, string>();
+  for (const row of recorded) {
+    perStudentDepartment.set(row.studentId, row.departmentCode);
+  }
+
+  return {
+    studentsWithMarks: studentsWithMarks.size,
+    entriesRecorded: recorded.length,
+    entriesReleased: recorded.filter((r) => r.released).length,
+    byComponent,
+    markedByDepartment: tallyBy(
+      [...perStudentDepartment.values()].map((departmentCode) => ({
+        departmentCode,
+      })),
+      (r) => r.departmentCode,
+    ),
+  };
+}
+
 /**
  * Describes an assignment rule in the words an admin would use.
  * NULL scope columns mean "any", which reads badly if rendered literally.

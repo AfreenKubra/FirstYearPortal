@@ -157,11 +157,123 @@ export default async function AdminOverviewPage() {
         </CardBody>
       </Card>
 
+      {/* Internal marks coverage (migration 0025).
+          Coverage and per-component averages only — never a CIE, and never a
+          single pooled "average mark", which across components with different
+          maxima would be a number with no meaning. */}
+      <Card as="section">
+        <CardHeader
+          title="Internal marks"
+          description="How much marking has happened and how much of it students can see. These are averages of recorded marks against each component's own maximum — not a CIE, which the college calculates from the VTU scheme."
+        />
+        <CardBody className="space-y-4">
+          {overview.marks.entriesRecorded === 0 ? (
+            <p className="text-sm text-ink-muted">
+              Nothing recorded yet. Marks are entered per subject by the
+              assigned teacher under Internal marks, against the VTU scheme
+              subjects on this portal.
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <StatTile
+                  label="Students with marks"
+                  value={String(overview.marks.studentsWithMarks)}
+                  hint={`of ${institution.totalStudents} on the portal`}
+                />
+                <StatTile
+                  label="Marks recorded"
+                  value={String(overview.marks.entriesRecorded)}
+                  hint="One per student, subject, and component"
+                />
+                <StatTile
+                  label="Released to students"
+                  value={String(overview.marks.entriesReleased)}
+                  hint={
+                    overview.marks.entriesReleased <
+                    overview.marks.entriesRecorded
+                      ? `${
+                          overview.marks.entriesRecorded -
+                          overview.marks.entriesReleased
+                        } still withheld`
+                      : "All of them"
+                  }
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-sm">
+                  <caption className="sr-only">
+                    Per-component marks coverage and averages
+                  </caption>
+                  <thead>
+                    <tr className="border-b border-indigo-100 text-left text-xs uppercase tracking-wide text-ink-faint">
+                      <th scope="col" className="py-2 pr-3 font-medium">
+                        Component
+                      </th>
+                      <th scope="col" className="py-2 pr-3 text-right font-medium">
+                        Recorded
+                      </th>
+                      <th scope="col" className="py-2 pr-3 text-right font-medium">
+                        Released
+                      </th>
+                      <th scope="col" className="py-2 text-right font-medium">
+                        Average
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-50">
+                    {overview.marks.byComponent.map((component) => (
+                      <tr key={component.code}>
+                        <th scope="row" className="py-2 pr-3 text-left font-normal">
+                          <span className="font-medium text-indigo-950">
+                            {component.label}
+                          </span>
+                          <span className="ml-1 text-xs text-ink-faint">
+                            out of {component.maxMarks}
+                          </span>
+                        </th>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ink">
+                          {component.recorded}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">
+                          {component.released}
+                        </td>
+                        <td className="py-2 text-right tabular-nums text-ink-muted">
+                          {/* Em dash, not 0% — nothing recorded is not the
+                              same as everyone scoring nothing. */}
+                          {component.averagePercent === null
+                            ? "—"
+                            : `${component.averagePercent}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-ink-faint">
+                Averages skip students who have not been marked rather than
+                counting them as zero, so an unmarked cohort does not read as a
+                failing one.
+              </p>
+            </>
+          )}
+        </CardBody>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <DistributionChart
           title="By department"
           data={institution.byDepartment}
         />
+        {overview.marks.entriesRecorded > 0 && (
+          <DistributionChart
+            title="Students marked, by department"
+            description="Students carrying at least one recorded mark."
+            data={overview.marks.markedByDepartment}
+          />
+        )}
         <DistributionChart title="By semester" data={institution.bySemester} />
         <DistributionChart
           title="By admission quota"

@@ -12,6 +12,11 @@ import {
   loginSchema,
   resetPasswordSchema,
 } from "@/lib/validation/auth";
+import {
+  clearAuthAttempt,
+  consumeAuthAttempt,
+  RATE_LIMITED_MESSAGE,
+} from "@/lib/auth/rate-limit";
 import { fieldErrorsFrom, type ActionState } from "./form-state";
 
 const CONSENT_TEXT =
@@ -62,6 +67,14 @@ export async function registerStudent(
   }
 
   const values = parsed.data;
+
+  // Registration creates an auth identity and sends mail, so it is metered
+  // like the other two (migration 0029).
+  const limit = await consumeAuthAttempt("register", values.email);
+  if (!limit.allowed) {
+    return { status: "error", message: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = createClient();
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -159,6 +172,13 @@ export async function login(
     };
   }
 
+  // Rate limit before touching Supabase, so a guessing run costs an indexed
+  // upsert rather than a password verification (migration 0029).
+  const limit = await consumeAuthAttempt("login", parsed.data.email);
+  if (!limit.allowed) {
+    return { status: "error", message: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
@@ -168,6 +188,11 @@ export async function login(
     // registered.
     return { status: "error", message: "Incorrect email or password." };
   }
+
+  // The password was right, so this was not a guessing run. Clearing the
+  // bucket keeps someone who fumbled a few attempts from spending the rest of
+  // the window one slip from being locked out of their own account.
+  await clearAuthAttempt(limit.buckets);
 
   const { data: account } = await supabase
     .from("users")
@@ -274,15 +299,23 @@ export async function requestPasswordReset(
     };
   }
 
+  // Each attempt sends mail, so an unmetered endpoint here is a way to flood
+  // an inbox from the college's own domain (migration 0029).
+  const limit = await consumeAuthAttempt("passwordReset", parsed.data.email);
+
   const origin = headers().get("origin") ?? "";
   const supabase = createClient();
 
-  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
-  });
+  if (limit.allowed) {
+    await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+      redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    });
+  }
 
   // Always reports success, whether or not the address exists — otherwise
-  // this endpoint becomes a way to enumerate registered students.
+  // this endpoint becomes a way to enumerate registered students. A refused
+  // caller is told the same thing for the same reason: a distinct
+  // "rate limited" reply would confirm the address is worth retrying.
   return {
     status: "success",
     message:

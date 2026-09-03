@@ -344,6 +344,95 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      auth_rate_limits: {
+        Row: {
+          bucket: string;
+          window_start: string;
+          attempts: number;
+          updated_at: string;
+        };
+        // Written only through `consume_rate_limit`, never directly — the
+        // table has RLS on with no policies at all (migration 0029).
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      subject_faculty: {
+        Row: {
+          subject_id: string;
+          faculty_id: string;
+          section: string | null;
+          assigned_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          subject_id: string;
+          faculty_id: string;
+          section?: string | null;
+          assigned_by?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      mark_components: {
+        Row: {
+          code: string;
+          label: string;
+          max_marks: number;
+          sort_order: number;
+          is_active: boolean;
+        };
+        Insert: {
+          code: string;
+          label: string;
+          max_marks: number;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: Partial<{
+          label: string;
+          max_marks: number;
+          sort_order: number;
+          is_active: boolean;
+        }>;
+        Relationships: [];
+      };
+      student_subject_marks: {
+        Row: {
+          student_id: string;
+          subject_id: string;
+          component_code: string;
+          // `numeric`. Arrives as a number from the installed stack, but
+          // PostgREST may serialise it as a string; queries/marks.ts
+          // normalises both rather than depending on which.
+          marks: number | string | null;
+          max_marks: number;
+          remark: string | null;
+          published_at: string | null;
+          entered_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          student_id: string;
+          subject_id: string;
+          component_code: string;
+          marks?: number | null;
+          max_marks: number;
+          remark?: string | null;
+          published_at?: string | null;
+          // Pinned by trigger to the calling faculty member — supplying it
+          // here has no effect, which is the point.
+          entered_by?: string | null;
+        };
+        Update: Partial<{
+          marks: number | null;
+          max_marks: number;
+          remark: string | null;
+          published_at: string | null;
+        }>;
+        Relationships: [];
+      };
       student_roadmaps: {
         Row: {
           id: string;
@@ -1015,6 +1104,24 @@ export type Database = {
         Args: { p_student_id: string };
         Returns: boolean;
       };
+      can_edit_subject_marks: {
+        Args: { p_subject_id: string; p_student_id: string };
+        Returns: boolean;
+      };
+      my_markable_subject_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+      consume_rate_limit: {
+        Args: {
+          p_bucket: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
+      clear_rate_limit: { Args: { p_bucket: string }; Returns: undefined };
+      prune_rate_limits: { Args: Record<string, never>; Returns: number };
     };
     Enums: {
       user_role: UserRole;
