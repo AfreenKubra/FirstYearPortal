@@ -33,6 +33,7 @@ import type {
   AchievementLevel,
   VerificationStatus,
 } from "@/config/achievements";
+import type { CalendarEventCategory } from "@/config/calendar";
 
 export type { ResidenceType };
 export type AdmissionQuota =
@@ -176,15 +177,15 @@ export type Database = {
         Relationships: [];
       };
       student_goals: {
-        Row: { student_id: string; goal_id: number };
-        Insert: { student_id: string; goal_id: number };
-        Update: { goal_id?: number };
+        Row: { student_id: string; goal_id: number; is_primary: boolean };
+        Insert: { student_id: string; goal_id: number; is_primary?: boolean };
+        Update: { goal_id?: number; is_primary?: boolean };
         Relationships: [];
       };
       student_domains: {
-        Row: { student_id: string; domain_id: number };
-        Insert: { student_id: string; domain_id: number };
-        Update: { domain_id?: number };
+        Row: { student_id: string; domain_id: number; is_primary: boolean };
+        Insert: { student_id: string; domain_id: number; is_primary?: boolean };
+        Update: { domain_id?: number; is_primary?: boolean };
         Relationships: [];
       };
       consent_records: {
@@ -430,6 +431,62 @@ export type Database = {
           max_marks: number;
           remark: string | null;
           published_at: string | null;
+        }>;
+        Relationships: [];
+      };
+      external_test_scores: {
+        Row: {
+          id: string;
+          student_id: string;
+          platform: string;
+          test_name: string;
+          score_label: string;
+          certificate_url: string | null;
+          category: string | null;
+          created_at: string;
+        };
+        Insert: {
+          student_id: string;
+          platform: string;
+          test_name: string;
+          score_label: string;
+          certificate_url?: string | null;
+          category?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      college_calendar_events: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          category: CalendarEventCategory;
+          starts_on: string;
+          ends_on: string | null;
+          semester: number | null;
+          is_key_date: boolean;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          title: string;
+          description?: string | null;
+          category: CalendarEventCategory;
+          starts_on: string;
+          ends_on?: string | null;
+          semester?: number | null;
+          is_key_date?: boolean;
+          created_by?: string | null;
+        };
+        Update: Partial<{
+          title: string;
+          description: string | null;
+          category: CalendarEventCategory;
+          starts_on: string;
+          ends_on: string | null;
+          semester: number | null;
+          is_key_date: boolean;
         }>;
         Relationships: [];
       };

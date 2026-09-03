@@ -123,6 +123,57 @@ describe("buildProviderLink", () => {
     expect(buildProviderLink("coursera", "   ")).toBeNull();
   });
 
+  it("returns the fixed Cisco Networking Academy landing page", () => {
+    const link = buildProviderLink("cisco", "");
+    expect(link).toEqual({
+      provider: "cisco_netacad",
+      providerLabel: "Cisco Networking Academy",
+      url: "https://www.netacad.com/courses/all-courses",
+    });
+  });
+
+  it("returns the fixed AWS Skill Builder landing page", () => {
+    expect(buildProviderLink("aws skill builder", "")?.url).toBe("https://skillbuilder.aws/");
+  });
+
+  it("returns the fixed IBM SkillsBuild landing page", () => {
+    expect(buildProviderLink("ibm", "")?.url).toBe("https://skillsbuild.org/");
+  });
+
+  it("returns the fixed Infosys Springboard landing page", () => {
+    expect(buildProviderLink("infosys springboard", "")?.url).toBe(
+      "https://infyspringboard.onwingspan.com/",
+    );
+  });
+
+  it("returns the fixed GitHub Skills landing page", () => {
+    expect(buildProviderLink("github skills", "")?.url).toBe("https://skills.github.com/");
+  });
+
+  it("returns the fixed Google for Developers landing page", () => {
+    expect(buildProviderLink("google for developers", "")?.url).toBe(
+      "https://developers.google.com/",
+    );
+  });
+
+  it("returns the fixed Kaggle Learn landing page", () => {
+    expect(buildProviderLink("kaggle", "")?.url).toBe("https://www.kaggle.com/learn");
+  });
+
+  it("builds a Microsoft Learn Training search URL, distinct from Microsoft Certifications", () => {
+    const training = buildProviderLink("ms learn", "python");
+    expect(training?.provider).toBe("microsoft_learn");
+    expect(training?.url).toBe(
+      "https://learn.microsoft.com/en-us/training/browse/?terms=python",
+    );
+
+    // A bare "microsoft learn" must still resolve to the certifications
+    // landing page exactly as it did before these providers were added.
+    expect(buildProviderLink("microsoft learn", "")?.provider).toBe(
+      "microsoft_certifications",
+    );
+  });
+
   it("never returns a generic fallback link", () => {
     // Every non-null result must point at one of the whitelisted domains —
     // there is no "default" URL this function can fall back to.
@@ -137,6 +188,13 @@ describe("buildProviderLink", () => {
       "learn.microsoft.com",
       "www.linkedin.com",
       "www.hackerrank.com",
+      "www.netacad.com",
+      "skillbuilder.aws",
+      "skillsbuild.org",
+      "infyspringboard.onwingspan.com",
+      "skills.github.com",
+      "developers.google.com",
+      "www.kaggle.com",
     ];
     for (const p of listProvidersForPrompt()) {
       const link = buildProviderLink(p.key, "sample keyword");
@@ -150,7 +208,7 @@ describe("buildProviderLink", () => {
 describe("listProvidersForPrompt", () => {
   it("lists every provider with whether it needs a keyword", () => {
     const list = listProvidersForPrompt();
-    expect(list.length).toBe(10);
+    expect(list.length).toBe(18);
     const fixed = list.filter((p) => !p.needsKeyword).map((p) => p.key);
     expect(fixed.sort()).toEqual(
       [
@@ -158,6 +216,13 @@ describe("listProvidersForPrompt", () => {
         "google_certificates",
         "microsoft_certifications",
         "hackerrank",
+        "cisco_netacad",
+        "aws_skill_builder",
+        "ibm_skillsbuild",
+        "infosys_springboard",
+        "github_skills",
+        "google_developers",
+        "kaggle_learn",
       ].sort(),
     );
   });

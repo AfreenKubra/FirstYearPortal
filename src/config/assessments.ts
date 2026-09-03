@@ -115,3 +115,79 @@ export const PSYCHOMETRIC_DISCLOSURE =
 export const PSYCHOMETRIC_CONSENT =
   "I understand these results are indicative, are for my own development, " +
   "and will be shared only with my assigned mentor.";
+
+/**
+ * The six areas a first-year employability profile usually names, and what
+ * each actually covers. Static copy, not a claim about the student — the
+ * numbers behind it (self-reported scores, assessment attempts) come from
+ * elsewhere and are attached to a category id, never invented here.
+ */
+export const SKILL_CATEGORIES = [
+  {
+    id: "aptitude",
+    label: "Aptitude",
+    covers: "Quantitative aptitude, numerical ability, analytical thinking.",
+  },
+  {
+    id: "logical_reasoning",
+    label: "Logical Reasoning",
+    covers: "Patterns, puzzles, decision-making, problem solving.",
+  },
+  {
+    id: "technical",
+    label: "Technical Aptitude",
+    covers:
+      "Basic programming logic, computational thinking, technology awareness.",
+  },
+  {
+    id: "communication",
+    label: "Communication Skills",
+    covers: "Vocabulary, comprehension, professional communication.",
+  },
+  {
+    id: "soft_skills",
+    label: "Soft Skills",
+    covers: "Teamwork, leadership, adaptability, time management.",
+  },
+  {
+    id: "personality",
+    label: "Personality Assessment",
+    covers:
+      "Working style, collaboration, initiative, learning preferences.",
+  },
+] as const;
+
+export type SkillCategoryId = (typeof SKILL_CATEGORIES)[number]["id"];
+
+export const SKILL_CATEGORY_VALUES = SKILL_CATEGORIES.map((c) => c.id) as [
+  SkillCategoryId,
+  ...SkillCategoryId[],
+];
+
+/**
+ * Real homepages, not fabricated deep links. This app does not know which
+ * specific NPTEL course or Springboard path fits a given student, so it sends
+ * them to the platform's own front door rather than guessing a URL.
+ */
+export const EXTERNAL_PLATFORMS = [
+  {
+    id: "nptel",
+    label: "NPTEL",
+    url: "https://nptel.ac.in",
+    hint: "Free technical courses with certification exams.",
+  },
+  {
+    id: "infosys_springboard",
+    label: "Infosys Springboard",
+    url: "https://infyspringboard.onwingspan.com",
+    hint: "Free courses and skill assessments across most of the six areas above.",
+  },
+] as const;
+
+/**
+ * Shown on every self-reported external score, next to the number itself —
+ * never left to be inferred from context. A score a student typed in is not
+ * the same fact as a score this portal graded, and the two must never look
+ * alike on screen.
+ */
+export const SELF_REPORTED_NOTICE = "Self-reported — not verified.";

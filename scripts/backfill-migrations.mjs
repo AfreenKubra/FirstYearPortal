@@ -134,6 +134,31 @@ const SIGNATURES = [
     "0024_event_goal_domain_tags.sql",
     `select to_regclass('public.event_goals') is not null`,
   ],
+  [
+    "0032_external_test_scores.sql",
+    `select to_regclass('public.external_test_scores') is not null`,
+  ],
+  [
+    "0033_college_calendar_events.sql",
+    `select to_regclass('public.college_calendar_events') is not null`,
+  ],
+  [
+    // Column probe, not a table one: 0035 drops the table 0034 created, so
+    // `to_regclass` would report 0034 as un-run on any database that has
+    // since applied 0035. `is_primary` is 0034's other, surviving change.
+    "0034_pathway_progress_and_primary_selection.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='student_goals'
+         and column_name='is_primary')`,
+  ],
+  [
+    "0035_drop_pathway_item_progress.sql",
+    `select to_regclass('public.pathway_item_progress') is null`,
+  ],
+  [
+    "0036_profile_photos.sql",
+    `select exists (select 1 from storage.buckets where id='profile-photos')`,
+  ],
 ];
 
 async function main() {

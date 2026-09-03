@@ -19,6 +19,7 @@ export type StudentRecord = {
   guardianName: string;
   guardianPhone: string;
   residenceType: string | null;
+  profilePhotoPath: string | null;
   completionPercent: number;
 };
 
@@ -41,7 +42,7 @@ export async function getOwnStudent(): Promise<StudentRecord | null> {
   const { data, error } = await supabase
     .from("students")
     .select(
-      "id, full_name, usn, email, phone, dob, state, city, department_code, guardian_name, guardian_phone, residence_type, profile_completion_percent, departments(name)",
+      "id, full_name, usn, email, phone, dob, state, city, department_code, guardian_name, guardian_phone, residence_type, profile_photo_url, profile_completion_percent, departments(name)",
     )
     .eq("user_id", user.id)
     .single();
@@ -64,8 +65,23 @@ export async function getOwnStudent(): Promise<StudentRecord | null> {
     guardianName: data.guardian_name,
     guardianPhone: data.guardian_phone,
     residenceType: data.residence_type,
+    profilePhotoPath: data.profile_photo_url,
     completionPercent: data.profile_completion_percent,
   };
+}
+
+/** Resolves a private profile-photo object to a short-lived display URL. */
+export async function getProfilePhotoUrl(
+  storagePath: string | null,
+): Promise<string | null> {
+  if (!storagePath) return null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.storage
+    .from("profile-photos")
+    .createSignedUrl(storagePath, 60 * 60);
+
+  return error ? null : data.signedUrl;
 }
 
 /** Builds the snapshot that `computeCompletionPercent` consumes. */

@@ -238,12 +238,6 @@ export function ExamTrackPanel({
           </Card>
         );
       })}
-
-      <p className="text-xs text-ink-faint">
-        Dates here were entered by your college into the resource catalogue.
-        They are shown exactly as recorded — nothing on this page estimates a
-        date, so a missing one stays missing rather than becoming a guess.
-      </p>
     </section>
   );
 }

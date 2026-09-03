@@ -1,30 +1,50 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader, EmptyState, StatTile } from "@/components/ui/Card";
 import { StartAttemptButton } from "@/components/assessments/StartAttemptButton";
-import { StudentMarksTable } from "@/components/marks/StudentMarksTable";
+import { AddExternalScorePanel } from "@/components/assessments/ExternalScoreForm";
+import { ExternalScoreCard } from "@/components/assessments/ExternalScoreCard";
 import { getOwnStudent } from "@/lib/queries/student";
 import { getStudentAssessments } from "@/lib/queries/assessments";
-import { getStudentMarks, listMarkComponents } from "@/lib/queries/marks";
+import {
+  getOwnAssessmentAverage,
+  listOwnExternalScores,
+} from "@/lib/queries/external-scores";
 import {
   assessmentKindLabel,
   attemptStatusLabel,
+  EXTERNAL_PLATFORMS,
+  SKILL_CATEGORIES,
 } from "@/config/assessments";
 import { AVAILABILITY_COPY } from "@/lib/assessments/grading";
 
 export const metadata: Metadata = { title: "My assessments" };
 
+function testLink(categoryId: string): { href: string; external: boolean } {
+  if (categoryId === "personality") {
+    return { href: "/assessments?kind=psychometric", external: false };
+  }
+  if (categoryId === "technical") {
+    return { href: EXTERNAL_PLATFORMS[0].url, external: true };
+  }
+  return { href: EXTERNAL_PLATFORMS[1].url, external: true };
+}
+
 export default async function StudentAssessmentsPage() {
   const student = await getOwnStudent();
   if (!student) redirect("/login");
 
-  // Three independent reads, so a missing marks migration cannot delay the
+  // Independent reads, so a missing marks migration cannot delay the
   // assessment list it has nothing to do with.
-  const [items, markComponents, subjectMarks] = await Promise.all([
+  const [
+    items,
+    psychometricAverage,
+    externalScores,
+  ] = await Promise.all([
     getStudentAssessments(),
-    listMarkComponents(),
-    getStudentMarks(student.id),
+    getOwnAssessmentAverage("psychometric"),
+    listOwnExternalScores(),
   ]);
 
   return (
@@ -37,12 +57,102 @@ export default async function StudentAssessmentsPage() {
         </p>
       </header>
 
-      {/* Internal marks first: they are the figures a student checks most
-          often, and they exist whether or not any assessment has been set. */}
-      <StudentMarksTable
-        components={markComponents}
-        subjects={subjectMarks}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatTile
+          label="Psychometric average"
+          value={
+            psychometricAverage.averagePercentage !== null
+              ? `${psychometricAverage.averagePercentage}%`
+              : "—"
+          }
+          hint={
+            psychometricAverage.attemptCount > 0
+              ? `From ${psychometricAverage.attemptCount} marked attempt${psychometricAverage.attemptCount === 1 ? "" : "s"}`
+              : "No marked attempts yet"
+          }
+        />
+        <StatTile
+          label="Self-reported scores"
+          value={String(externalScores.length)}
+          hint="From NPTEL, Springboard, and similar"
+        />
+      </div>
+
+      <Card as="section">
+        <CardHeader
+          title="Skills covered"
+          description="What each area tests, and where to take a test. Personality links to this portal's own psychometric assessment; the rest are external platforms this portal cannot verify."
+        />
+        <CardBody>
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">
+              The six skill areas, what each covers, and where to test them
+            </caption>
+            <thead>
+              <tr className="border-b border-indigo-100 text-xs uppercase tracking-wide text-ink-faint">
+                <th scope="col" className="py-2 pr-3 font-medium">Area</th>
+                <th scope="col" className="py-2 pr-3 font-medium">What can be tested</th>
+                <th scope="col" className="py-2 pl-3 font-medium">Take the test</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SKILL_CATEGORIES.map((category) => {
+                const link = testLink(category.id);
+                return (
+                  <tr key={category.id} className="border-b border-indigo-50 align-top">
+                    <th scope="row" className="py-2.5 pr-3 font-medium text-indigo-950">
+                      {category.label}
+                    </th>
+                    <td className="py-2.5 pr-3 text-ink-muted">{category.covers}</td>
+                    <td className="py-2.5 pl-3">
+                      {link.external ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-indigo-700 hover:underline"
+                        >
+                          Take the test ↗
+                        </a>
+                      ) : (
+                        <Link href={link.href} className="font-medium text-indigo-700 hover:underline">
+                          Take the test
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+            NPTEL and Infosys Springboard are shown as their own homepages —
+            this portal does not pick a specific course or test on your behalf.
+          </p>
+        </CardBody>
+      </Card>
+
+      <Card as="section">
+        <CardHeader
+          title="Your self-reported scores"
+          description="Anything you've recorded from an external platform. Not verified by anyone here."
+        />
+        <CardBody className="space-y-4">
+          {externalScores.length === 0 ? (
+            <EmptyState
+              title="Nothing recorded yet"
+              description="Add a score from NPTEL, Infosys Springboard, or elsewhere."
+            />
+          ) : (
+            <ul className="space-y-3">
+              {externalScores.map((score) => (
+                <ExternalScoreCard key={score.id} score={score} />
+              ))}
+            </ul>
+          )}
+          <AddExternalScorePanel />
+        </CardBody>
+      </Card>
 
       {items.length === 0 ? (
         <Card>

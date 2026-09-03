@@ -9,7 +9,7 @@ import {
   type DomainShelf,
 } from "@/components/roadmap/DomainCourseShelf";
 import { getOwnStudent, getLookups, getProfileSnapshot } from "@/lib/queries/student";
-import { getOwnRoadmap } from "@/lib/queries/roadmaps";
+import { getOwnRoadmap, roadmapProgress } from "@/lib/queries/roadmaps";
 import { getDepartmentStats } from "@/lib/queries/vtu";
 import { refreshOwnRoadmap } from "@/lib/roadmap/refresh";
 import {
@@ -18,6 +18,12 @@ import {
   listResources,
 } from "@/lib/queries/resources";
 import { countUpcomingEventsByTag } from "@/lib/queries/events";
+import { getOwnAssessmentAverage } from "@/lib/queries/external-scores";
+import { buildRadarData } from "@/lib/roadmap/radar";
+import { RadarChart } from "@/components/roadmap/RadarChart";
+import { getDomainSelections, getGoalSelections, getPathwayEvidence } from "@/lib/queries/pathway";
+import { buildPathway, resolvePrimary } from "@/lib/roadmap/pathway";
+import { CareerPathwayTimeline } from "@/components/roadmap/CareerPathwayTimeline";
 
 export const metadata: Metadata = { title: "My roadmap" };
 
@@ -64,14 +70,53 @@ export default async function StudentRoadmapPage() {
    * unrelated event was published, and "3 workshops for your goal" would stop
    * being true the moment it was most useful.
    */
-  const [catalogue, workshopsOnCalendar] = await Promise.all([
-    listResources(),
-    countUpcomingEventsByTag({
-      goalIds: snapshot.goalIds,
-      domainIds: snapshot.domainIds,
-      kind: "workshop",
-    }),
-  ]);
+  const [catalogue, workshopsOnCalendar, assessmentAverage, goalSelections, domainSelections, pathwayEvidence] =
+    await Promise.all([
+      listResources(),
+      countUpcomingEventsByTag({
+        goalIds: snapshot.goalIds,
+        domainIds: snapshot.domainIds,
+        kind: "workshop",
+      }),
+      getOwnAssessmentAverage(),
+      getGoalSelections(student.id),
+      getDomainSelections(student.id),
+      getPathwayEvidence(student.id),
+    ]);
+
+  // The career pathway timeline: independent of the AI/rule-based roadmap
+  // below it, so it renders whenever the student has at least one goal and
+  // one domain selected, even before that roadmap has ever been generated.
+  const primaryGoal = resolvePrimary(goalSelections);
+  const primaryDomain = resolvePrimary(domainSelections);
+  const recordedSemester = snapshot.academic.semester ?? null;
+  const pathway =
+    primaryGoal && primaryDomain
+      ? buildPathway({
+          goalName: primaryGoal.name,
+          domainName: primaryDomain.name,
+          // Where the student is comes from the academic record, not from
+          // anything they ticked off about themselves.
+          semester: recordedSemester,
+        })
+      : null;
+  const secondaryDomainNames = domainSelections
+    .filter((d) => d.id !== primaryDomain?.id)
+    .map((d) => d.name);
+
+  // Five real ratios, not an invented "how you're doing" score — see
+  // `radar.ts`. `roadmap` may be null above this point in a first render, so
+  // milestone progress is 0 rather than skipping the axis.
+  const radarData = buildRadarData({
+    goalsChosen: snapshot.goalIds.length,
+    goalsOffered: lookups.goals.length,
+    domainsChosen: snapshot.domainIds.length,
+    domainsOffered: lookups.domains.length,
+    interestsChosen: snapshot.interestIds.length,
+    interestsOffered: lookups.interests.length,
+    milestonesPercent: roadmap ? roadmapProgress(roadmap).percent : 0,
+    assessmentAveragePercent: assessmentAverage.averagePercentage,
+  });
 
   const exams = filterExamResourcesForGoals(catalogue, snapshot.goalIds);
 
@@ -94,6 +139,17 @@ export default async function StudentRoadmapPage() {
       };
     })
     .filter((s): s is DomainShelf => s !== null);
+
+  // Real counts for the pathway's "Recommended for your journey" cards —
+  // the same catalogue `DomainCourseShelf` reads below, just counted by kind
+  // for the primary domain rather than listed in full a second time.
+  const primaryDomainResources = primaryDomain
+    ? filterResourcesForDomains(catalogue, [primaryDomain.id])
+    : [];
+  const courseCount = primaryDomainResources.filter((r) => r.kind === "course").length;
+  const certificationCount = primaryDomainResources.filter(
+    (r) => r.kind === "certification",
+  ).length;
 
   // Phrased as the student would describe the section, not as column names.
   const profileGaps = [
@@ -121,6 +177,24 @@ export default async function StudentRoadmapPage() {
         </p>
       )}
 
+      {pathway && (
+        <CareerPathwayTimeline
+          goalOptions={goalSelections}
+          domainOptions={domainSelections}
+          allGoals={lookups.goals}
+          allDomains={lookups.domains}
+          primaryGoal={primaryGoal}
+          primaryDomain={primaryDomain}
+          secondaryDomainNames={secondaryDomainNames}
+          pathway={pathway}
+          evidence={pathwayEvidence}
+          semester={recordedSemester}
+          courseCount={courseCount}
+          certificationCount={certificationCount}
+          workshopCount={workshopsOnCalendar}
+        />
+      )}
+
       {!roadmap ? (
         <Card>
           <CardBody>
@@ -132,6 +206,8 @@ export default async function StudentRoadmapPage() {
         </Card>
       ) : (
         <>
+          <RadarChart data={radarData} />
+
           {/* Above the milestones: a date you can miss outranks a plan you can
               do at any time. Renders nothing at all when no dated exam is
               tagged to the student's goals. */}

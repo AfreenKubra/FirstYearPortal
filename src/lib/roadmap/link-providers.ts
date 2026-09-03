@@ -37,7 +37,15 @@ export type ProviderKey =
   | "google_certificates"
   | "microsoft_certifications"
   | "linkedin_learning"
-  | "hackerrank";
+  | "hackerrank"
+  | "cisco_netacad"
+  | "aws_skill_builder"
+  | "ibm_skillsbuild"
+  | "infosys_springboard"
+  | "github_skills"
+  | "microsoft_learn"
+  | "google_developers"
+  | "kaggle_learn";
 
 type SearchProvider = {
   key: ProviderKey;
@@ -129,6 +137,74 @@ const PROVIDERS: ProviderDef[] = [
     label: "HackerRank Skills Verification",
     aliases: ["hackerrank", "hackerrank skills verification"],
     url: "https://www.hackerrank.com/skills-verification",
+  },
+  // Added for the career pathway timeline. All eight are `fixed` rather than
+  // `search`: unlike nptel/coursera/edx/udemy/linkedin, whose query-string
+  // search formats are well documented and stable, these platforms' own
+  // search behaviour is either app-gated (Springboard), single-catalogue-page
+  // (GitHub Skills, Kaggle Learn, Cisco NetAcad), or not confidently
+  // verifiable — landing on a real, working page beats guessing a query
+  // parameter that might silently 404.
+  {
+    key: "cisco_netacad",
+    type: "fixed",
+    label: "Cisco Networking Academy",
+    aliases: ["cisco", "cisco networking academy", "netacad"],
+    url: "https://www.netacad.com/courses/all-courses",
+  },
+  {
+    key: "aws_skill_builder",
+    type: "fixed",
+    label: "AWS Skill Builder",
+    aliases: ["aws skill builder", "skill builder"],
+    url: "https://skillbuilder.aws/",
+  },
+  {
+    key: "ibm_skillsbuild",
+    type: "fixed",
+    label: "IBM SkillsBuild",
+    aliases: ["ibm", "ibm skillsbuild", "skillsbuild"],
+    url: "https://skillsbuild.org/",
+  },
+  {
+    key: "infosys_springboard",
+    type: "fixed",
+    label: "Infosys Springboard",
+    aliases: ["infosys", "infosys springboard", "springboard"],
+    url: "https://infyspringboard.onwingspan.com/",
+  },
+  {
+    key: "github_skills",
+    type: "fixed",
+    label: "GitHub Skills",
+    aliases: ["github", "github skills"],
+    url: "https://skills.github.com/",
+  },
+  {
+    // Deliberately distinct label/aliases from `microsoft_certifications`
+    // above ("microsoft", "microsoft learn") so a bare "Microsoft Learn"
+    // keeps resolving to the certifications landing page exactly as before —
+    // this is the training-catalogue search, reached only by its own,
+    // unambiguous name.
+    key: "microsoft_learn",
+    type: "search",
+    label: "Microsoft Learn Training",
+    aliases: ["microsoft learn training", "ms learn"],
+    buildUrl: (k) => `https://learn.microsoft.com/en-us/training/browse/?terms=${encodeURIComponent(k)}`,
+  },
+  {
+    key: "google_developers",
+    type: "fixed",
+    label: "Google for Developers",
+    aliases: ["google for developers", "google developers"],
+    url: "https://developers.google.com/",
+  },
+  {
+    key: "kaggle_learn",
+    type: "fixed",
+    label: "Kaggle Learn",
+    aliases: ["kaggle", "kaggle learn"],
+    url: "https://www.kaggle.com/learn",
   },
 ];
 
