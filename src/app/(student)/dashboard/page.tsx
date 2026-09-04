@@ -98,7 +98,7 @@ export default async function DashboardPage() {
   const [profilePhotoUrl, markComponents, subjectMarks] = await Promise.all([
     getProfilePhotoUrl(student.profilePhotoPath),
     listMarkComponents(),
-    getStudentMarks(student.id),
+    getStudentMarks(student.id, student.departmentCode, academic?.semester ?? null),
   ]);
 
   // Three real sources, merged into one calendar: the official college

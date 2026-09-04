@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { pivotToComponents, releasedOnly, sumRecorded } from "@/lib/marks/compute";
+import { getSubjectsFor } from "@/lib/queries/vtu";
 import type { MarkComponent, MarkEntry } from "@/config/marks";
 import type { AnalyticsMarkRow } from "@/lib/admin/analytics";
 
@@ -561,85 +562,72 @@ export type StudentSubjectMarks = {
 };
 
 /**
- * The signed-in student's own card, one row per subject.
+ * The signed-in student's own card, one row for every subject on their
+ * scheme — not only the ones with something released yet.
+ *
+ * An earlier version dropped a subject entirely until its first component
+ * was released, on the reasoning that a row of dashes "tells a student
+ * nothing except that the portal knows their timetable." The college wants
+ * the opposite: seeing the full subject list up front, with each cell
+ * honestly blank until faculty enter and release it, rather than a subject
+ * silently missing with no way to tell whether that means "nothing marked
+ * yet" or "not on my scheme at all."
+ *
+ * `departmentCode`/`semester` resolve the scheme via `getSubjectsFor()` —
+ * the same scheme-year-aware lookup the roadmap and the old academic-marks
+ * card both used — so a subject the student is actually taking always has a
+ * row, whether or not any marks exist for it yet.
  *
  * RLS already withholds unreleased components, but `releasedOnly()` runs
  * anyway: this same function backs the staff preview of a student's card,
  * where the caller *can* read unreleased rows, and a total that silently
  * included them would show staff a figure the student cannot see.
- *
- * Subjects with nothing released at all are dropped rather than rendered
- * empty — a table of dashes tells a student nothing except that the portal
- * knows their timetable.
  */
 export async function getStudentMarks(
   studentId: string,
+  departmentCode: string,
+  semester: number | null,
 ): Promise<StudentSubjectMarks[]> {
   const supabase = createClient();
-  const components = await listMarkComponents();
 
-  const { data } = await supabase
-    .from("student_subject_marks")
-    .select(
-      "student_id, subject_id, component_code, marks, max_marks, remark, published_at",
-    )
-    .eq("student_id", studentId)
-    .limit(500);
+  const [components, schemeSubjects, marksResult] = await Promise.all([
+    listMarkComponents(),
+    getSubjectsFor(departmentCode, semester),
+    supabase
+      .from("student_subject_marks")
+      .select(
+        "student_id, subject_id, component_code, marks, max_marks, remark, published_at",
+      )
+      .eq("student_id", studentId)
+      .limit(500),
+  ]);
 
-  const markRows = (data ?? []) as MarkRow[];
-  if (markRows.length === 0) return [];
+  if (schemeSubjects.length === 0) return [];
 
-  // Subject names come from a second query rather than an embedded join: the
-  // hand-written types carry `Relationships: []` (see `supabase/types.ts`), so
-  // postgrest-js cannot resolve `vtu_subjects(...)` at the type level. Same
-  // approach as `attachDomains()` in `queries/vtu.ts`.
-  const { data: subjectRows } = await supabase
-    .from("vtu_subjects")
-    .select("id, code, name")
-    .in("id", [...new Set(markRows.map((r) => r.subject_id))]);
+  const markRows = (marksResult.data ?? []) as MarkRow[];
 
-  const subjectById = new Map(
-    ((subjectRows ?? []) as Array<{ id: string; code: string; name: string }>).map(
-      (row) => [row.id, row],
-    ),
-  );
-
-  const bySubject = new Map<
-    string,
-    { code: string; name: string; entries: MarkEntry[] }
-  >();
-
+  const entriesBySubject = new Map<string, MarkEntry[]>();
   for (const row of markRows) {
-    const subject = subjectById.get(row.subject_id);
-    if (!subject) continue;
-
-    const existing = bySubject.get(row.subject_id) ?? {
-      code: subject.code,
-      name: subject.name,
-      entries: [],
-    };
-    existing.entries.push(mapEntry(row));
-    bySubject.set(row.subject_id, existing);
+    entriesBySubject.set(row.subject_id, [
+      ...(entriesBySubject.get(row.subject_id) ?? []),
+      mapEntry(row),
+    ]);
   }
 
-  const result: StudentSubjectMarks[] = [];
+  return schemeSubjects
+    .map((subject) => {
+      const visible = releasedOnly(entriesBySubject.get(subject.id) ?? []);
+      const { scored, outOf, recordedCount } = sumRecorded(visible);
 
-  for (const [subjectId, subject] of bySubject) {
-    const visible = releasedOnly(subject.entries);
-    if (visible.length === 0) continue;
-
-    const { scored, outOf, recordedCount } = sumRecorded(visible);
-
-    result.push({
-      subjectId,
-      subjectCode: subject.code,
-      subjectName: subject.name,
-      cells: pivotToComponents(components, visible),
-      scored,
-      outOf,
-      recordedCount,
-    });
-  }
-
-  return result.sort((a, b) => a.subjectCode.localeCompare(b.subjectCode));
+      return {
+        subjectId: subject.id,
+        subjectCode: subject.code,
+        subjectName: subject.name,
+        cells: pivotToComponents(components, visible),
+        scored,
+        outOf,
+        recordedCount,
+      };
+    })
+    .sort((a, b) => a.subjectCode.localeCompare(b.subjectCode));
 }

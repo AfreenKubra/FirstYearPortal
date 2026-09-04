@@ -32,6 +32,21 @@ export const SUM_DISCLAIMER =
 export const UNRELEASED_NOTICE = "Not released yet";
 
 /**
+ * The components shown on a student's own card, by code.
+ *
+ * Faculty still record every active component in `mark_components` — this
+ * narrows only what the student's dashboard renders, at the college's
+ * request. Because the card shows a subset, it deliberately shows no total
+ * either: a "sum" over two of four components would look like a CIE and be
+ * short by the two it left out, which is exactly the misreading `SUM_LABEL`
+ * exists to prevent.
+ *
+ * Typed as `readonly string[]` rather than a literal tuple so `.includes()`
+ * accepts any component code without a cast.
+ */
+export const STUDENT_VISIBLE_COMPONENT_CODES: readonly string[] = ["ia1", "ia2"];
+
+/**
  * Shown to staff above the grid. States the accountability position plainly
  * rather than implying a subject-teacher restriction that does not exist yet
  * (MANUAL-STEPS: no `subject_faculty` table).
