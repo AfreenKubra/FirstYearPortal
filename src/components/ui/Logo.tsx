@@ -10,10 +10,13 @@ export function Logo({
   size = "md",
   showText = true,
 }: {
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   showText?: boolean;
 }) {
-  const box = size === "sm" ? "h-8 w-8" : "h-10 w-10";
+  const box =
+    size === "sm" ? "h-8 w-8" : size === "lg" ? "h-12 w-12" : "h-10 w-10";
+  const nameSize = size === "lg" ? "text-base" : "text-sm";
+  const detailSize = size === "lg" ? "text-xs" : "text-[0.6875rem]";
 
   return (
     <span className="flex items-center gap-2.5">
@@ -83,10 +86,14 @@ export function Logo({
       )}
       {showText && (
         <span className="min-w-0">
-          <span className="block truncate font-display text-sm font-semibold leading-tight text-indigo-950">
+          <span
+            className={`block truncate font-display ${nameSize} font-semibold leading-tight text-indigo-950`}
+          >
             {branding.product.name}
           </span>
-          <span className="block truncate text-[0.6875rem] leading-tight text-ink-faint">
+          <span
+            className={`block truncate ${detailSize} leading-tight text-ink-faint`}
+          >
             {branding.institution.shortName} · {branding.institution.city}
           </span>
         </span>

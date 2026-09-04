@@ -25,7 +25,7 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <header className="border-b border-indigo-100 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
-          <Logo />
+          <Logo size="lg" />
           <nav className="flex items-center gap-2">
             <ButtonLink href="/login" variant="ghost" size="sm">
               Sign in
@@ -50,9 +50,8 @@ export default function LandingPage() {
                 {branding.institution.shortName} · First year
               </p>
               <h1 className="text-4xl leading-[1.1] text-indigo-950 sm:text-5xl md:text-6xl">
-                Every first-year student,{" "}
-                <span className="text-brass-600">actually known</span> by the
-                people mentoring them.
+                Turning every first-year student&apos;s potential into a pathway
+                for <span className="text-brass-600">purposeful growth.</span>
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
                 A single record of each student&apos;s academic background,
@@ -70,11 +69,6 @@ export default function LandingPage() {
           <h2 className="text-2xl text-indigo-950 sm:text-3xl">
             Built around three roles, with hard boundaries between them
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-            A student never sees another student&apos;s data. A faculty member
-            never sees students outside their assignment. Those limits are
-            enforced in the database itself, not only in the interface.
-          </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {ROLES.map((role) => (
