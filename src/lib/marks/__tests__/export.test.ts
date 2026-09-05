@@ -36,6 +36,8 @@ function student(over: Partial<DirectoryRow> = {}): DirectoryRow {
     guardianName: null,
     guardianPhone: null,
     guardianVisible: false,
+    photoPath: null,
+    photoUrl: null,
     ...over,
   };
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { getProfilePhotoUrl } from "@/lib/queries/student";
 import {
   summariseDepartments,
   summariseInstitution,
@@ -157,6 +158,10 @@ export type PendingAccount = {
   identifier: string | null;
   departmentCode: string | null;
   designation: string | null;
+  /** Storage path of the student's photo, or null for staff/no upload. */
+  photoPath: string | null;
+  /** Signed URL for `photoPath`, filled in for rendered rows only. */
+  photoUrl: string | null;
   /** True for the signed-in admin's own row — they cannot decide on it. */
   isSelf: boolean;
 };
@@ -204,7 +209,9 @@ export async function getAccountQueue(): Promise<{
       .from("faculty")
       .select("user_id, full_name, employee_code, department_code, designation"),
     supabase.from("admins").select("user_id, full_name, employee_code, designation"),
-    supabase.from("students").select("user_id, full_name, usn, department_code"),
+    supabase
+      .from("students")
+      .select("user_id, full_name, usn, department_code, profile_photo_url"),
     supabase.from("user_roles").select("user_id, role"),
   ]);
 
@@ -254,18 +261,31 @@ export async function getAccountQueue(): Promise<{
       departmentCode:
         student?.department_code ?? faculty?.department_code ?? null,
       designation: faculty?.designation ?? admin?.designation ?? null,
+      photoPath: student?.profile_photo_url ?? null,
+      photoUrl: null,
       isSelf: account.id === currentUser?.id,
     };
   });
 
-  return {
-    // Oldest first: a student who registered on day one should be approved
-    // before someone who signed up an hour ago.
-    pending: mapped
-      .filter((a) => a.status === "pending")
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    recent: mapped.filter((a) => a.status !== "pending").slice(0, 25),
-  };
+  // Oldest first: a student who registered on day one should be approved
+  // before someone who signed up an hour ago.
+  const pending = mapped
+    .filter((a) => a.status === "pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const recent = mapped.filter((a) => a.status !== "pending").slice(0, 25);
+
+  // Photos are signed only for the rows actually rendered, not all 500
+  // accounts: each signature is a round trip to storage, and the ones off
+  // the end of the list would be paid for and thrown away.
+  await Promise.all(
+    [...pending, ...recent]
+      .filter((a) => a.photoPath !== null)
+      .map(async (a) => {
+        a.photoUrl = await getProfilePhotoUrl(a.photoPath);
+      }),
+  );
+
+  return { pending, recent };
 }
 
 // --- Faculty assignments ----------------------------------------------------

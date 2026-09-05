@@ -75,13 +75,31 @@ export function DirectoryView({
           <h1 className="text-2xl text-indigo-950 sm:text-3xl">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink-muted">{intro}</p>
         </div>
+        {/* Three formats of the same report, all carrying the filters
+            currently applied: Excel for analysis, PDF for filing or printing,
+            CSV for anything that reads plain text. Each file states which
+            filters produced it, since these get emailed around and detached
+            from the query that made them. */}
         {total > 0 && (
-          <ButtonLink
-            href={`${exportPath}?${exportQuery}`}
-            variant="secondary"
-          >
-            Download CSV ({total})
-          </ButtonLink>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-ink-faint">
+              Report of these {total}:
+            </span>
+            <ButtonLink
+              href={`${exportPath}?${exportQuery}&format=pdf`}
+              variant="secondary"
+              size="sm"
+            >
+              PDF
+            </ButtonLink>
+            <ButtonLink
+              href={`${exportPath}?${exportQuery}&format=csv`}
+              variant="secondary"
+              size="sm"
+            >
+              CSV
+            </ButtonLink>
+          </div>
         )}
       </header>
 

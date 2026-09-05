@@ -9,6 +9,19 @@ import {
 } from "@/lib/faculty/filters";
 import type { DirectoryRow } from "@/lib/queries/directory";
 
+/** First letters of the first two words, for the avatar fallback. */
+function initials(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
 const QUOTA_LABELS: Record<string, string> = {
   cet: "KCET",
   comedk: "COMEDK",
@@ -102,13 +115,36 @@ export function StudentTable({
                   {rows.map((student) => (
                     <tr key={student.id} className="hover:bg-indigo-50/40">
                       <td className="px-5 py-3">
-                        <Link
-                          href={`${basePath}/${student.id}`}
-                          className="rounded font-medium text-indigo-900 hover:underline"
-                        >
-                          {student.fullName}
-                        </Link>
-                        <p className="text-xs text-ink-faint">{student.usn}</p>
+                        <div className="flex items-center gap-2.5">
+                          {/* The photo the student uploaded, initials where
+                              there is none — the circle keeps its size either
+                              way so the name column does not jog about. */}
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-100 bg-indigo-50 text-[0.625rem] font-semibold text-indigo-800">
+                            {student.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- signed
+                              // Supabase URL that expires hourly; next/image would
+                              // cache a URL already dead by the time it served it.
+                              <img
+                                src={student.photoUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span aria-hidden="true">
+                                {initials(student.fullName)}
+                              </span>
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <Link
+                              href={`${basePath}/${student.id}`}
+                              className="rounded font-medium text-indigo-900 hover:underline"
+                            >
+                              {student.fullName}
+                            </Link>
+                            <p className="text-xs text-ink-faint">{student.usn}</p>
+                          </span>
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-ink-muted">
                         {student.departmentCode}

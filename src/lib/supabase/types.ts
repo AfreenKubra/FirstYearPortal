@@ -1107,6 +1107,7 @@ export type Database = {
           guardian_name: string | null;
           guardian_phone: string | null;
           guardian_visible: boolean;
+          profile_photo_url: string | null;
         };
         Relationships: [];
       };

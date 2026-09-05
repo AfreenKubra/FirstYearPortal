@@ -48,3 +48,4 @@ students.local.json
 # Generated credential lists — names, emails, and passwords together
 student-credentials*.csv
 *.local.csv
+.vercel

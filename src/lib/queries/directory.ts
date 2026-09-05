@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE, type StudentFilters } from "@/lib/faculty/filters";
-import type { LookupOption } from "./student";
+import { getProfilePhotoUrl, type LookupOption } from "./student";
 import type { AdmissionQuota } from "@/lib/supabase/types";
 import type { ResidenceType } from "@/config/residence";
 
@@ -39,6 +39,10 @@ export type DirectoryRow = {
   guardianName: string | null;
   guardianPhone: string | null;
   guardianVisible: boolean;
+  /** Storage path of the uploaded photo, or null. Signed at render time. */
+  photoPath: string | null;
+  /** Signed URL for `photoPath`. Filled in for a rendered page only. */
+  photoUrl: string | null;
 };
 
 type DirectoryDbRow = {
@@ -61,6 +65,7 @@ type DirectoryDbRow = {
   guardian_name: string | null;
   guardian_phone: string | null;
   guardian_visible: boolean;
+  profile_photo_url: string | null;
 };
 
 export function mapRow(row: DirectoryDbRow): DirectoryRow {
@@ -84,6 +89,8 @@ export function mapRow(row: DirectoryDbRow): DirectoryRow {
     guardianName: row.guardian_name,
     guardianPhone: row.guardian_phone,
     guardianVisible: row.guardian_visible,
+    photoPath: row.profile_photo_url,
+    photoUrl: null,
   };
 }
 
@@ -93,7 +100,7 @@ export function mapRow(row: DirectoryDbRow): DirectoryRow {
  * every result to `GenericStringError`.
  */
 const DIRECTORY_COLUMNS =
-  "id, full_name, usn, email, phone, department_code, city, state, semester, section, quota, residence_type, tenth_percentage, twelfth_percentage, entrance_rank, profile_completion_percent, guardian_name, guardian_phone, guardian_visible" as const;
+  "id, full_name, usn, email, phone, department_code, city, state, semester, section, quota, residence_type, tenth_percentage, twelfth_percentage, entrance_rank, profile_completion_percent, guardian_name, guardian_phone, guardian_visible, profile_photo_url" as const;
 
 /**
  * Resolves the student ids matching a many-to-many filter (interest, goal,
@@ -232,9 +239,22 @@ export async function listStudents(
     return { rows: [], total: 0, page: filters.page, pageCount: 0 };
   }
 
+  const rows = (data ?? []).map(mapRow);
+
+  // Signed here rather than in `listAllMatchingStudents`: this is one page,
+  // so the signatures are bounded by PAGE_SIZE. That function can return
+  // thousands of rows for an export, and an export carries no photos.
+  await Promise.all(
+    rows
+      .filter((row) => row.photoPath !== null)
+      .map(async (row) => {
+        row.photoUrl = await getProfilePhotoUrl(row.photoPath);
+      }),
+  );
+
   const total = count ?? 0;
   return {
-    rows: (data ?? []).map(mapRow),
+    rows,
     total,
     page: filters.page,
     pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),

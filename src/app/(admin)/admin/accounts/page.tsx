@@ -22,12 +22,26 @@ const STATUS_LABELS: Record<string, string> = {
   suspended: "Suspended",
 };
 
+/** First letters of the first two words, for the avatar fallback. */
+function initials(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
 function StatusPill({ status }: { status: string }) {
   return (
     <span
       className={[
         "rounded-md border px-2 py-1 text-xs font-medium",
-        STATUS_STYLES[status] ?? "border-indigo-100 bg-indigo-50 text-indigo-800",
+        STATUS_STYLES[status] ??
+          "border-indigo-100 bg-indigo-50 text-indigo-800",
       ].join(" ")}
     >
       {STATUS_LABELS[status] ?? status}
@@ -50,56 +64,79 @@ function AccountCard({
     identifier: string | null;
     departmentCode: string | null;
     designation: string | null;
+    photoUrl: string | null;
     isSelf: boolean;
   };
 }) {
+  const displayName = account.fullName ?? account.email;
+
   return (
     <li className="flex flex-wrap items-start justify-between gap-4 py-4">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium text-indigo-950">
-            {account.fullName ?? account.email}
-          </p>
-          <StatusPill status={account.status} />
-          {/* The primary role first and marked, then any additional ones —
+      <div className="flex min-w-0 gap-3">
+        {/* The student's own uploaded photo where there is one, initials
+            otherwise — an account with no photo still needs to occupy the
+            same space, or the rows jog left and right down the list. */}
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-100 bg-indigo-50 text-sm font-semibold text-indigo-800">
+          {account.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- signed
+            // Supabase URL, expires hourly; not a candidate for next/image's
+            // optimiser, which would cache a URL that has already expired.
+            <img
+              src={account.photoUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span aria-hidden="true">{initials(displayName)}</span>
+          )}
+        </span>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-indigo-950">{displayName}</p>
+            <StatusPill status={account.status} />
+            {/* The primary role first and marked, then any additional ones —
               an account holding two roles should read as holding two. */}
-          {[
-            account.role,
-            ...account.roles.filter((r) => r !== account.role),
-          ].map((role) => (
-            <span
-              key={role}
-              className={[
-                "rounded-md border px-2 py-0.5 text-xs font-medium",
-                role === account.role
-                  ? "border-indigo-100 bg-indigo-50 text-indigo-800"
-                  : "border-brass-300/60 bg-brass-50 text-brass-800",
-              ].join(" ")}
-            >
-              {roleLabel(role)}
-              {role === account.role && account.roles.length > 1 && (
-                <span className="ml-1 text-[0.625rem] opacity-70">home</span>
-              )}
-            </span>
-          ))}
-        </div>
-        <p className="mt-1 break-all text-sm text-ink-muted">{account.email}</p>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          {[
-            account.designation,
-            account.departmentCode,
-            account.identifier,
-            `Requested ${new Date(account.createdAt).toLocaleDateString()}`,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        {!account.fullName && (
-          <p className="mt-1 text-xs text-warning">
-            No profile attached — this account signed up but never completed
-            its record.
+            {[
+              account.role,
+              ...account.roles.filter((r) => r !== account.role),
+            ].map((role) => (
+              <span
+                key={role}
+                className={[
+                  "rounded-md border px-2 py-0.5 text-xs font-medium",
+                  role === account.role
+                    ? "border-indigo-100 bg-indigo-50 text-indigo-800"
+                    : "border-brass-300/60 bg-brass-50 text-brass-800",
+                ].join(" ")}
+              >
+                {roleLabel(role)}
+                {role === account.role && account.roles.length > 1 && (
+                  <span className="ml-1 text-[0.625rem] opacity-70">home</span>
+                )}
+              </span>
+            ))}
+          </div>
+          <p className="mt-1 break-all text-sm text-ink-muted">
+            {account.email}
           </p>
-        )}
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {[
+              account.designation,
+              account.departmentCode,
+              account.identifier,
+              `Requested ${new Date(account.createdAt).toLocaleDateString()}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {!account.fullName && (
+            <p className="mt-1 text-xs text-warning">
+              No profile attached — this account signed up but never completed
+              its record.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-start gap-4">
@@ -109,13 +146,13 @@ function AccountCard({
           primaryRole={account.role}
           roles={account.roles}
           hasStaffRecord={account.hasStaffRecord}
-          name={account.fullName ?? account.email}
+          name={displayName}
           isSelf={account.isSelf}
         />
         <AccountDecision
           userId={account.userId}
           status={account.status}
-          name={account.fullName ?? account.email}
+          name={displayName}
           isSelf={account.isSelf}
         />
       </div>
@@ -132,14 +169,6 @@ export default async function AdminAccountsPage() {
         <h1 className="text-2xl text-indigo-950 sm:text-3xl">
           Account approvals
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Every new account stays inactive until approved here. Students keep
-          whatever profile details they entered while they wait, so approving
-          one lets them straight in with nothing lost. Promoting an approved
-          faculty account to Head of Department gives them their whole
-          department; the Administrator role is limited to allow-listed
-          addresses and cannot be granted from this screen.
-        </p>
       </header>
 
       <Card as="section">

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { listAllMatchingStudents } from "@/lib/queries/directory";
 import { parseFilters } from "@/lib/faculty/filters";
-import { directoryCsvResponse } from "@/lib/directory/export";
+import { parseReportFormat } from "@/lib/directory/export";
+import { directoryReportResponse } from "@/lib/directory/export-formats";
 import { getMarksSummary, listMarkComponents } from "@/lib/queries/marks";
 
 export async function GET(request: NextRequest) {
@@ -23,12 +24,15 @@ export async function GET(request: NextRequest) {
     components,
   );
 
-  return directoryCsvResponse({
+  return directoryReportResponse(
+    parseReportFormat(request.nextUrl.searchParams.get("format")),
+    {
     rows,
     filters,
     generatedBy: `${staff.fullName} (${staff.employeeCode})`,
     scopeNote: `Department: ${staff.departmentCode}`,
     filenamePrefix: `${staff.departmentCode.toLowerCase()}-students`,
     marksSummary,
-  });
+    },
+  );
 }
