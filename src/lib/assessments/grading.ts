@@ -237,3 +237,60 @@ export const AVAILABILITY_COPY: Record<
   closed: "This assessment has closed.",
   no_attempts_left: "You have used all your attempts.",
 };
+
+/**
+ * How many questions were right, wrong, or left blank.
+ *
+ * Derived from the same `QuestionOutcome[]` the score came from, so the three
+ * counts and the percentage can never disagree — recomputing them separately
+ * from the answer rows is exactly how a "16 correct out of 20, 72%" line
+ * starts appearing.
+ *
+ * A question nobody has marked yet is counted in none of the three. It is not
+ * wrong, and calling it unanswered would be a claim about the student rather
+ * than about the marking.
+ */
+export type AttemptBreakdown = {
+  correct: number;
+  wrong: number;
+  unanswered: number;
+  awaitingMarking: number;
+};
+
+export function countBreakdown(
+  outcomes: readonly QuestionOutcome[],
+  answers: readonly SubmittedAnswer[],
+): AttemptBreakdown {
+  const answered = new Set(
+    answers
+      .filter(
+        (a) =>
+          a.selectedOptionIds.length > 0 ||
+          (a.textAnswer !== null && a.textAnswer.trim().length > 0),
+      )
+      .map((a) => a.questionId),
+  );
+
+  let correct = 0;
+  let wrong = 0;
+  let unanswered = 0;
+  let awaitingMarking = 0;
+
+  for (const outcome of outcomes) {
+    if (outcome.awardedPoints === null) {
+      awaitingMarking += 1;
+    } else if (!answered.has(outcome.questionId)) {
+      unanswered += 1;
+    } else if (outcome.awardedPoints >= outcome.maxPoints && outcome.maxPoints > 0) {
+      correct += 1;
+    } else if (outcome.maxPoints === 0) {
+      // A zero-point question has no right answer to get. Counting it as
+      // wrong would penalise a student for a paper's own scoring choice.
+      awaitingMarking += 0;
+    } else {
+      wrong += 1;
+    }
+  }
+
+  return { correct, wrong, unanswered, awaitingMarking };
+}

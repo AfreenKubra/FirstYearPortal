@@ -166,6 +166,12 @@ const SIGNATURES = [
          and column_name='profile_photo_url')`,
   ],
   [
+    "0039_assessment_analytics.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='assessments'
+         and column_name='skill_category')`,
+  ],
+  [
     "0038_resource_semester_range.sql",
     `select exists (select 1 from pg_constraint
        where conrelid='public.resources'::regclass

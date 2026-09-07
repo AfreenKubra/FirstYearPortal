@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   availability,
+  countBreakdown,
   finaliseAttempt,
   gradeAttempt,
   gradeQuestion,
@@ -338,5 +339,91 @@ describe("availability", () => {
         now,
       ),
     ).toEqual({ open: false, reason: "not_published" });
+  });
+});
+
+describe("countBreakdown", () => {
+  const outcome = (
+    questionId: string,
+    awardedPoints: number | null,
+    maxPoints = 1,
+  ) => ({ questionId, awardedPoints, maxPoints, autoMarked: awardedPoints !== null });
+
+  const answered = (questionId: string) => ({
+    questionId,
+    selectedOptionIds: ["x"],
+    textAnswer: null,
+  });
+
+  it("separates right, wrong, and left blank", () => {
+    const result = countBreakdown(
+      [outcome("a", 1), outcome("b", 0), outcome("c", 0)],
+      [answered("a"), answered("b")],
+    );
+    expect(result).toEqual({
+      correct: 1,
+      wrong: 1,
+      unanswered: 1,
+      awaitingMarking: 0,
+    });
+  });
+
+  it("counts an unmarked answer in none of the three", () => {
+    // A long answer nobody has read is not wrong, and calling it unanswered
+    // would blame the student for the marking queue.
+    const result = countBreakdown(
+      [outcome("a", 1), outcome("b", null)],
+      [answered("a"), answered("b")],
+    );
+    expect(result).toEqual({
+      correct: 1,
+      wrong: 0,
+      unanswered: 0,
+      awaitingMarking: 1,
+    });
+  });
+
+  it("treats whitespace-only text as unanswered", () => {
+    const result = countBreakdown(
+      [outcome("a", 0)],
+      [{ questionId: "a", selectedOptionIds: [], textAnswer: "   " }],
+    );
+    expect(result.unanswered).toBe(1);
+    expect(result.wrong).toBe(0);
+  });
+
+  it("counts a text answer as answered", () => {
+    const result = countBreakdown(
+      [outcome("a", 0)],
+      [{ questionId: "a", selectedOptionIds: [], textAnswer: "my answer" }],
+    );
+    expect(result.unanswered).toBe(0);
+    expect(result.wrong).toBe(1);
+  });
+
+  it("counts partial credit as wrong rather than correct", () => {
+    const result = countBreakdown([outcome("a", 1, 2)], [answered("a")]);
+    expect(result).toEqual({
+      correct: 0,
+      wrong: 1,
+      unanswered: 0,
+      awaitingMarking: 0,
+    });
+  });
+
+  it("does not mark a zero-point question wrong", () => {
+    // Worth nothing is a property of the paper, not a mistake by the student.
+    const result = countBreakdown([outcome("a", 0, 0)], [answered("a")]);
+    expect(result.wrong).toBe(0);
+    expect(result.correct).toBe(0);
+  });
+
+  it("returns all zeroes for an empty paper", () => {
+    expect(countBreakdown([], [])).toEqual({
+      correct: 0,
+      wrong: 0,
+      unanswered: 0,
+      awaitingMarking: 0,
+    });
   });
 });

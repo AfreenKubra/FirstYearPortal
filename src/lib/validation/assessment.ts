@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ASSESSMENT_KIND_VALUES,
+  SKILL_CATEGORY_VALUES,
   QUESTION_KIND_VALUES,
   hasOptions,
 } from "@/config/assessments";
@@ -44,7 +45,7 @@ export const assessmentSchema = z
       errorMap: () => ({ message: "Choose an assessment type." }),
     }),
     departmentCode: optionalText(10),
-    semester: optionalNumber(1, 2, "First-year students are in semester 1 or 2."),
+    semester: optionalNumber(1, 8, "Semester must be between 1 and 8."),
     section: optionalText(4),
     opensAt: optionalTimestamp,
     closesAt: optionalTimestamp,
@@ -56,6 +57,13 @@ export const assessmentSchema = z
       .max(10, "At most ten attempts."),
     passPercentage: optionalNumber(0, 100, "A pass mark is a percentage."),
     randomiseQuestions: z.boolean(),
+    // Which of the six skill areas this paper measures, or none. A subject
+    // quiz is a real assessment that belongs to no area, so "" is a valid
+    // answer here and becomes NULL rather than an error.
+    skillCategory: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+      z.enum(SKILL_CATEGORY_VALUES).nullable(),
+    ),
   })
   .refine(
     (v) =>

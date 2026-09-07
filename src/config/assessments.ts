@@ -191,3 +191,89 @@ export const EXTERNAL_PLATFORMS = [
  * alike on screen.
  */
 export const SELF_REPORTED_NOTICE = "Self-reported — not verified.";
+
+/**
+ * The bands a percentage is reported in.
+ *
+ * Every band carries a `label`, and the label is what the UI must render —
+ * colour alone is not a way to tell a student how they did, because a
+ * colour-blind reader, a printed page, and a screen reader all lose it. The
+ * `tone` is decoration on top of the words, never instead of them.
+ *
+ * Ordered low to high, and exhaustive over 0-100 with no gap between bands,
+ * so `performanceLevel` can never fall through.
+ */
+export const PERFORMANCE_LEVELS = [
+  { id: "needs_improvement", label: "Needs Improvement", min: 0,  max: 39,  tone: "danger" },
+  { id: "developing",        label: "Developing",        min: 40, max: 59,  tone: "warn" },
+  { id: "good",              label: "Good",              min: 60, max: 74,  tone: "info" },
+  { id: "strong",            label: "Strong",            min: 75, max: 89,  tone: "success" },
+  { id: "excellent",         label: "Excellent",         min: 90, max: 100, tone: "success" },
+] as const;
+
+export type PerformanceLevel = (typeof PERFORMANCE_LEVELS)[number];
+
+/**
+ * The one category that is never scored.
+ *
+ * A personality questionnaire has no right answers, so it has no percentage,
+ * no pass mark, and no place on the skill radar. It reports completion and
+ * nothing else — the rule PSYCHOMETRIC_DISCLOSURE states in words, held here
+ * in a form the code can actually obey.
+ */
+export const UNSCORED_CATEGORY_ID = "personality";
+
+/** The five areas that do carry a percentage, in radar order. */
+export const SCORED_CATEGORY_IDS = SKILL_CATEGORIES.filter(
+  (c) => c.id !== UNSCORED_CATEGORY_ID,
+).map((c) => c.id);
+
+/**
+ * Optional outside practice, offered as practice and labelled as such.
+ *
+ * Every URL was fetched and returned 200 when it was added. None of these
+ * sites reports back to this portal, so nothing a student scores on them
+ * arrives here on its own — they can record it by hand under "Add external
+ * result", where it stays marked self-reported until a faculty member
+ * verifies it. Claiming these sync would be the easiest lie on the page.
+ */
+export const EXTERNAL_PRACTICE: ReadonlyArray<{
+  categoryId: SkillCategoryId;
+  label: string;
+  url: string;
+  provider: string;
+}> = [
+  {
+    categoryId: "aptitude",
+    label: "Try External Aptitude Practice",
+    url: "https://trainthinking.com/ccat-practice-test/",
+    provider: "TrainThinking",
+  },
+  {
+    categoryId: "logical_reasoning",
+    label: "Try External Logical Reasoning Test",
+    url: "https://trainthinking.com/logical-reasoning-test/",
+    provider: "TrainThinking",
+  },
+  {
+    // The British Council India page given for this refused every request
+    // made to it, so the link points at EnglishScore's own site instead —
+    // the same test, from the people who run it, and a URL that resolves.
+    categoryId: "communication",
+    label: "Take the EnglishScore test",
+    url: "https://englishscore.com/",
+    provider: "EnglishScore (British Council)",
+  },
+  {
+    categoryId: "soft_skills",
+    label: "Explore Soft Skills Assessments",
+    url: "https://risely.me/resources/assessments/",
+    provider: "Risely",
+  },
+  {
+    categoryId: "personality",
+    label: "Take Personality Assessment",
+    url: "https://www.16personalities.com/free-personality-test",
+    provider: "16Personalities",
+  },
+];

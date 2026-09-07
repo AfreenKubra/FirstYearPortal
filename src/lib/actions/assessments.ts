@@ -18,7 +18,12 @@ import {
   gradeAnswerSchema,
   questionSchema,
 } from "@/lib/validation/assessment";
-import { availability, finaliseAttempt, gradeAttempt } from "@/lib/assessments/grading";
+import {
+  availability,
+  countBreakdown,
+  finaliseAttempt,
+  gradeAttempt,
+} from "@/lib/assessments/grading";
 import { hasOptions } from "@/config/assessments";
 import { fieldErrorsFrom, type ActionState } from "./form-state";
 
@@ -48,6 +53,7 @@ function readAssessmentForm(formData: FormData) {
     maxAttempts: formData.get("maxAttempts") ?? 1,
     passPercentage: formData.get("passPercentage"),
     randomiseQuestions: formData.get("randomiseQuestions") === "on",
+    skillCategory: formData.get("skillCategory"),
   };
 }
 
@@ -97,6 +103,7 @@ export async function createAssessment(
       max_attempts: values.maxAttempts,
       pass_percentage: values.passPercentage,
       randomise_questions: values.randomiseQuestions,
+      skill_category: values.skillCategory,
     })
     .select("id")
     .single();
@@ -148,6 +155,7 @@ export async function updateAssessment(
       max_attempts: values.maxAttempts,
       pass_percentage: values.passPercentage,
       randomise_questions: values.randomiseQuestions,
+      skill_category: values.skillCategory,
     })
     .eq("id", id);
 
@@ -481,16 +489,43 @@ export async function saveAnswers(
       .eq("question_id", outcome.questionId);
   }
 
+  // The right/wrong/blank counts come from the same outcomes the score came
+  // from, so the breakdown on the results page can never contradict the
+  // percentage above it. Stored rather than recomputed on every render:
+  // otherwise the dashboard re-reads every answer row of every attempt.
+  const breakdown = countBreakdown(
+    result.outcomes,
+    answers.map((a) => ({
+      questionId: a.questionId,
+      selectedOptionIds: a.selectedOptionIds,
+      textAnswer: a.textAnswer,
+    })),
+  );
+
+  const submittedAt = new Date();
+  const timeTakenSeconds = Math.max(
+    0,
+    Math.round((submittedAt.getTime() - new Date(attempt.startedAt).getTime()) / 1000),
+  );
+
   await service
     .from("assessment_attempts")
     .update({
       status: result.needsManualMarking ? "submitted" : "graded",
-      submitted_at: new Date().toISOString(),
+      submitted_at: submittedAt.toISOString(),
       score: result.score,
       max_score: result.maxScore,
       percentage: result.percentage,
       passed: result.passed,
-      graded_at: result.needsManualMarking ? null : new Date().toISOString(),
+      graded_at: result.needsManualMarking ? null : submittedAt.toISOString(),
+      correct_count: breakdown.correct,
+      wrong_count: breakdown.wrong,
+      unanswered_count: breakdown.unanswered,
+      time_taken_seconds: timeTakenSeconds,
+      // `integrity_status` is deliberately left null. Nothing in this portal
+      // watches a sitting yet, and writing 'low_risk' on the strength of
+      // having observed nothing would tell a mentor an attempt had been
+      // checked and cleared when it had not been looked at at all.
     })
     .eq("id", attemptId);
 

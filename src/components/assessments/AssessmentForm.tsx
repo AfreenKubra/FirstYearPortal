@@ -5,7 +5,7 @@ import { createAssessment, updateAssessment } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
-import { ASSESSMENT_KINDS } from "@/config/assessments";
+import { ASSESSMENT_KINDS, SKILL_CATEGORIES } from "@/config/assessments";
 import type { AssessmentSummary } from "@/lib/queries/assessments";
 
 /** `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time, not an ISO string. */
@@ -84,6 +84,22 @@ export function AssessmentForm({
         error={errors.kind}
       />
 
+      {/* Without a skill area, a paper cannot appear on a student's readiness
+          dashboard — it lands under "other assessments" instead. Left blank
+          on purpose for a subject quiz, which is not one of the six areas. */}
+      <Select
+        label="Skill area"
+        name="skillCategory"
+        placeholder="Not one of the six skill areas"
+        defaultValue={assessment?.skillCategory ?? ""}
+        options={SKILL_CATEGORIES.map((c) => ({
+          value: c.id,
+          label: `${c.label} — ${c.covers}`,
+        }))}
+        error={errors.skillCategory}
+        hint="Papers with a skill area are counted into the student's assessment readiness figure."
+      />
+
       <fieldset className="grid gap-4 sm:grid-cols-3">
         <legend className="mb-1 text-sm font-medium text-ink-muted">
           Audience
@@ -101,10 +117,10 @@ export function AssessmentForm({
           name="semester"
           placeholder="Any semester"
           defaultValue={assessment?.semester?.toString() ?? ""}
-          options={[
-            { value: 1, label: "Semester 1" },
-            { value: 2, label: "Semester 2" },
-          ]}
+          options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+            value: n,
+            label: `Semester ${n}`,
+          }))}
           error={errors.semester}
         />
         <TextInput

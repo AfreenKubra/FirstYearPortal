@@ -6,6 +6,7 @@ import type {
   AssessmentKind,
   AttemptStatus,
   QuestionKind,
+  SkillCategoryId,
 } from "@/config/assessments";
 
 /**
@@ -38,10 +39,12 @@ export type AssessmentSummary = {
   randomiseQuestions: boolean;
   isPublished: boolean;
   createdAt: string;
+  /** Which of the six skill areas this paper measures, if any. */
+  skillCategory: SkillCategoryId | null;
 };
 
 const ASSESSMENT_COLUMNS =
-  "id, title, description, kind, department_code, semester, section, opens_at, closes_at, duration_minutes, max_attempts, pass_percentage, randomise_questions, is_published, created_at" as const;
+  "id, title, description, kind, department_code, semester, section, opens_at, closes_at, duration_minutes, max_attempts, pass_percentage, randomise_questions, is_published, created_at, skill_category" as const;
 
 type AssessmentDbRow = {
   id: string;
@@ -59,6 +62,7 @@ type AssessmentDbRow = {
   randomise_questions: boolean;
   is_published: boolean;
   created_at: string;
+  skill_category: SkillCategoryId | null;
 };
 
 function mapAssessment(row: AssessmentDbRow): AssessmentSummary {
@@ -78,6 +82,7 @@ function mapAssessment(row: AssessmentDbRow): AssessmentSummary {
     randomiseQuestions: row.randomise_questions,
     isPublished: row.is_published,
     createdAt: row.created_at,
+    skillCategory: row.skill_category,
   };
 }
 
@@ -260,10 +265,17 @@ export type Attempt = {
   maxScore: number | null;
   percentage: number | null;
   passed: boolean | null;
+  /** Written at grading time; null on an attempt sat before 0039. */
+  correctCount: number | null;
+  wrongCount: number | null;
+  unansweredCount: number | null;
+  timeTakenSeconds: number | null;
+  /** null means not assessed, which is not the same as low risk. */
+  integrityStatus: "low_risk" | "review_recommended" | null;
 };
 
 const ATTEMPT_COLUMNS =
-  "id, assessment_id, student_id, attempt_number, status, started_at, submitted_at, score, max_score, percentage, passed" as const;
+  "id, assessment_id, student_id, attempt_number, status, started_at, submitted_at, score, max_score, percentage, passed, correct_count, wrong_count, unanswered_count, time_taken_seconds, integrity_status" as const;
 
 type AttemptDbRow = {
   id: string;
@@ -277,6 +289,11 @@ type AttemptDbRow = {
   max_score: number | null;
   percentage: number | null;
   passed: boolean | null;
+  correct_count: number | null;
+  wrong_count: number | null;
+  unanswered_count: number | null;
+  time_taken_seconds: number | null;
+  integrity_status: "low_risk" | "review_recommended" | null;
 };
 
 function mapAttempt(row: AttemptDbRow): Attempt {
@@ -292,6 +309,11 @@ function mapAttempt(row: AttemptDbRow): Attempt {
     maxScore: row.max_score === null ? null : Number(row.max_score),
     percentage: row.percentage === null ? null : Number(row.percentage),
     passed: row.passed,
+    correctCount: row.correct_count,
+    wrongCount: row.wrong_count,
+    unansweredCount: row.unanswered_count,
+    timeTakenSeconds: row.time_taken_seconds,
+    integrityStatus: row.integrity_status,
   };
 }
 
@@ -423,4 +445,76 @@ export async function getPendingMarkingCount(): Promise<number> {
     .select("id", { count: "exact", head: true })
     .eq("status", "submitted");
   return count ?? 0;
+}
+
+/**
+ * The signed-in student's own results, grouped by skill area.
+ *
+ * Built from `getStudentAssessments()` rather than a second query, so the
+ * dashboard's figures and the paper list underneath it come out of one
+ * snapshot and cannot disagree about how many attempts were used.
+ *
+ * Papers with no `skill_category` are excluded on purpose. A lecturer's
+ * subject quiz is a real assessment, but folding it into a figure labelled
+ * "assessment readiness" — which names six specific employability areas —
+ * would make that number mean something other than what the page says.
+ */
+export type CategoryResults = {
+  categoryId: SkillCategoryId;
+  /** Published papers in this area the student may sit. */
+  papers: StudentAssessment[];
+  attempts: ReadonlyArray<{
+    attemptNumber: number;
+    percentage: number | null;
+    submittedAt: string | null;
+    correct: number | null;
+    wrong: number | null;
+    timeTakenSeconds: number | null;
+  }>;
+};
+
+export async function getOwnCategoryResults(): Promise<{
+  byCategory: CategoryResults[];
+  uncategorised: StudentAssessment[];
+}> {
+  const items = await getStudentAssessments();
+
+  const byCategory = new Map<SkillCategoryId, CategoryResults>();
+  const uncategorised: StudentAssessment[] = [];
+
+  for (const item of items) {
+    const categoryId = item.assessment.skillCategory;
+    if (!categoryId) {
+      uncategorised.push(item);
+      continue;
+    }
+
+    const existing = byCategory.get(categoryId) ?? {
+      categoryId,
+      papers: [],
+      attempts: [],
+    };
+
+    byCategory.set(categoryId, {
+      categoryId,
+      papers: [...existing.papers, item],
+      attempts: [
+        ...existing.attempts,
+        ...item.attempts
+          // An attempt still in progress has no result to report. Counting it
+          // would inflate the attempt total with a paper still being sat.
+          .filter((a) => a.status !== "in_progress" && a.status !== "abandoned")
+          .map((a) => ({
+            attemptNumber: a.attemptNumber,
+            percentage: a.percentage,
+            submittedAt: a.submittedAt,
+            correct: a.correctCount,
+            wrong: a.wrongCount,
+            timeTakenSeconds: a.timeTakenSeconds,
+          })),
+      ],
+    });
+  }
+
+  return { byCategory: [...byCategory.values()], uncategorised };
 }

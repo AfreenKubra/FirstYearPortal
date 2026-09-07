@@ -5,143 +5,225 @@ import { Card, CardBody, CardHeader, EmptyState, StatTile } from "@/components/u
 import { StartAttemptButton } from "@/components/assessments/StartAttemptButton";
 import { AddExternalScorePanel } from "@/components/assessments/ExternalScoreForm";
 import { ExternalScoreCard } from "@/components/assessments/ExternalScoreCard";
+import { ReadinessGauge } from "@/components/assessments/ReadinessGauge";
+import { SkillRadar } from "@/components/assessments/SkillRadar";
+import { SkillAreaCard } from "@/components/assessments/SkillAreaCard";
 import { getOwnStudent } from "@/lib/queries/student";
-import { getStudentAssessments } from "@/lib/queries/assessments";
-import {
-  getOwnAssessmentAverage,
-  listOwnExternalScores,
-} from "@/lib/queries/external-scores";
+import { getOwnCategoryResults } from "@/lib/queries/assessments";
+import { listOwnExternalScores } from "@/lib/queries/external-scores";
 import {
   assessmentKindLabel,
   attemptStatusLabel,
-  EXTERNAL_PLATFORMS,
-  SKILL_CATEGORIES,
+  EXTERNAL_PRACTICE,
 } from "@/config/assessments";
 import { AVAILABILITY_COPY } from "@/lib/assessments/grading";
+import {
+  buildInsights,
+  buildReadiness,
+  buildSkillAxes,
+} from "@/lib/assessments/readiness";
 
 export const metadata: Metadata = { title: "My assessments" };
 
-function testLink(categoryId: string): { href: string; external: boolean } {
-  if (categoryId === "personality") {
-    return { href: "/assessments?kind=psychometric", external: false };
-  }
-  if (categoryId === "technical") {
-    return { href: EXTERNAL_PLATFORMS[0].url, external: true };
-  }
-  return { href: EXTERNAL_PLATFORMS[1].url, external: true };
-}
-
+/**
+ * The student's assessment dashboard.
+ *
+ * Every figure on this page is derived from marked attempt rows by the pure
+ * functions in `lib/assessments/readiness.ts` — there is no sample data, no
+ * placeholder score, and no default of zero. A student who has sat nothing
+ * sees "Not attempted yet" throughout, and that is the correct rendering of
+ * their situation rather than a gap to be filled.
+ *
+ * Papers are grouped into the six skill areas by `assessments.skill_category`
+ * (0039). A paper without one still appears, further down, under its own
+ * heading — it is a real assessment, it just is not one of the six areas the
+ * readiness figure claims to measure.
+ */
 export default async function StudentAssessmentsPage() {
   const student = await getOwnStudent();
   if (!student) redirect("/login");
 
-  // Independent reads, so a missing marks migration cannot delay the
-  // assessment list it has nothing to do with.
-  const [
-    items,
-    psychometricAverage,
-    externalScores,
-  ] = await Promise.all([
-    getStudentAssessments(),
-    getOwnAssessmentAverage("psychometric"),
+  const [{ byCategory, uncategorised }, externalScores] = await Promise.all([
+    getOwnCategoryResults(),
     listOwnExternalScores(),
   ]);
+
+  const readiness = buildReadiness(
+    byCategory.map((c) => ({ categoryId: c.categoryId, attempts: [...c.attempts] })),
+  );
+  const axes = buildSkillAxes(readiness.summaries);
+  const insights = buildInsights(readiness);
+  const resultsByCategory = new Map(byCategory.map((c) => [c.categoryId, c]));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
         <h1 className="text-2xl text-indigo-950 sm:text-3xl">My assessments</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Assessments set for your department, semester, and section. Your
-          results appear here once they have been marked.
+          Six skill areas, and how you are doing in each. Everything here comes
+          from assessments you have actually sat and that have been marked.
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatTile
-          label="Psychometric average"
-          value={
-            psychometricAverage.averagePercentage !== null
-              ? `${psychometricAverage.averagePercentage}%`
-              : "—"
-          }
-          hint={
-            psychometricAverage.attemptCount > 0
-              ? `From ${psychometricAverage.attemptCount} marked attempt${psychometricAverage.attemptCount === 1 ? "" : "s"}`
-              : "No marked attempts yet"
-          }
-        />
-        <StatTile
-          label="Self-reported scores"
-          value={String(externalScores.length)}
-          hint="From NPTEL, Springboard, and similar"
-        />
-      </div>
-
+      {/* --- Overall readiness ------------------------------------------- */}
       <Card as="section">
         <CardHeader
-          title="Skills covered"
-          description="What each area tests, and where to take a test. Personality links to this portal's own psychometric assessment; the rest are external platforms this portal cannot verify."
+          title="Overall assessment readiness"
+          description="The average of your latest marked score in each scored area you have attempted. The personality questionnaire is not scored, so it is not counted here."
         />
         <CardBody>
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">
-              The six skill areas, what each covers, and where to test them
-            </caption>
-            <thead>
-              <tr className="border-b border-indigo-100 text-xs uppercase tracking-wide text-ink-faint">
-                <th scope="col" className="py-2 pr-3 font-medium">Area</th>
-                <th scope="col" className="py-2 pr-3 font-medium">What can be tested</th>
-                <th scope="col" className="py-2 pl-3 font-medium">Take the test</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SKILL_CATEGORIES.map((category) => {
-                const link = testLink(category.id);
-                return (
-                  <tr key={category.id} className="border-b border-indigo-50 align-top">
-                    <th scope="row" className="py-2.5 pr-3 font-medium text-indigo-950">
-                      {category.label}
-                    </th>
-                    <td className="py-2.5 pr-3 text-ink-muted">{category.covers}</td>
-                    <td className="py-2.5 pl-3">
-                      {link.external ? (
-                        <a
-                          href={link.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-indigo-700 hover:underline"
-                        >
-                          Take the test ↗
-                        </a>
-                      ) : (
-                        <Link href={link.href} className="font-medium text-indigo-700 hover:underline">
-                          Take the test
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            NPTEL and Infosys Springboard are shown as their own homepages —
-            this portal does not pick a specific course or test on your behalf.
-          </p>
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+            <ReadinessGauge
+              percentage={readiness.overallPercentage}
+              level={readiness.overallLevel}
+            />
+
+            <div className="grid flex-1 gap-3 sm:grid-cols-2">
+              <StatTile
+                label="Areas attempted"
+                value={`${readiness.completedCount}/${readiness.totalCategories}`}
+                hint="Of the six skill areas"
+              />
+              <StatTile
+                label="Total attempts"
+                value={String(readiness.totalAttempts)}
+                hint="Across every area"
+              />
+              <StatTile
+                label="Strongest area"
+                value={readiness.strongest?.label ?? "—"}
+                hint={
+                  readiness.strongest?.latestPercentage != null
+                    ? `${readiness.strongest.latestPercentage}%`
+                    : "Needs results in two areas to compare"
+                }
+              />
+              <StatTile
+                label="Needs improvement"
+                value={readiness.needsImprovement?.label ?? "—"}
+                hint={
+                  readiness.needsImprovement?.latestPercentage != null
+                    ? `${readiness.needsImprovement.latestPercentage}%`
+                    : "Needs results in two areas to compare"
+                }
+              />
+            </div>
+          </div>
+
+          {insights.length > 0 && (
+            <dl className="mt-5 space-y-1.5 border-t border-indigo-100 pt-4">
+              {insights.map((insight) => (
+                <div key={insight.heading} className="text-sm">
+                  <dt className="inline font-medium text-indigo-950">
+                    {insight.heading}:{" "}
+                  </dt>
+                  <dd className="inline text-ink-muted">{insight.detail}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </CardBody>
       </Card>
 
+      {/* --- Per-area cards ---------------------------------------------- */}
+      <section className="space-y-4">
+        <h2 className="text-lg text-indigo-950">Assessment progress</h2>
+        <div className="grid gap-4">
+          {readiness.summaries.map((summary) => (
+            <SkillAreaCard
+              key={summary.categoryId}
+              summary={summary}
+              results={resultsByCategory.get(summary.categoryId)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* --- Radar -------------------------------------------------------- */}
+      <SkillRadar axes={axes} />
+
+      {/* --- Other papers ------------------------------------------------- */}
+      {uncategorised.length > 0 && (
+        <Card as="section">
+          <CardHeader
+            title="Other assessments set for your class"
+            description="Papers that are not one of the six skill areas — a subject test or a departmental exercise. They are not counted in the readiness figure above."
+          />
+          <CardBody>
+            <ul className="space-y-3">
+              {uncategorised.map(({ assessment, attempts, availability }) => {
+                const latest = attempts[0];
+                return (
+                  <li
+                    key={assessment.id}
+                    className="rounded-lg border border-indigo-100 px-3.5 py-3"
+                  >
+                    <p className="text-sm font-medium text-indigo-950">
+                      {assessment.title}
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      {assessmentKindLabel(assessment.kind)}
+                      {assessment.durationMinutes
+                        ? ` · ${assessment.durationMinutes} minutes`
+                        : ""}
+                      {` · ${attempts.length} of ${assessment.maxAttempts} attempts used`}
+                    </p>
+
+                    {latest && (
+                      <p className="mt-1.5 text-xs text-ink-muted">
+                        Last attempt: {attemptStatusLabel(latest.status)}
+                        {latest.percentage !== null && (
+                          <>
+                            {" · "}
+                            <span className="font-medium tabular-nums text-indigo-900">
+                              {latest.percentage}%
+                            </span>
+                          </>
+                        )}
+                        {" · "}
+                        <Link
+                          href={`/assessments/${assessment.id}/attempt/${latest.id}`}
+                          className="font-medium text-indigo-700 hover:underline"
+                        >
+                          {latest.status === "in_progress"
+                            ? "Continue this attempt"
+                            : "See your answers"}
+                        </Link>
+                      </p>
+                    )}
+
+                    <div className="mt-2">
+                      {availability.open ? (
+                        <StartAttemptButton
+                          assessmentId={assessment.id}
+                          kind={assessment.kind}
+                          resuming={latest?.status === "in_progress"}
+                        />
+                      ) : (
+                        <p className="text-xs text-ink-faint">
+                          {AVAILABILITY_COPY[availability.reason]}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* --- Self-reported external results ------------------------------- */}
       <Card as="section">
         <CardHeader
-          title="Your self-reported scores"
-          description="Anything you've recorded from an external platform. Not verified by anyone here."
+          title="Your external results"
+          description="Anything you have recorded from an outside platform. Self-reported until a faculty member verifies it, and never counted in the readiness figure above."
         />
         <CardBody className="space-y-4">
           {externalScores.length === 0 ? (
             <EmptyState
               title="Nothing recorded yet"
-              description="Add a score from NPTEL, Infosys Springboard, or elsewhere."
+              description="Sat a test somewhere else? Record it here so it appears on your profile."
             />
           ) : (
             <ul className="space-y-3">
@@ -154,98 +236,30 @@ export default async function StudentAssessmentsPage() {
         </CardBody>
       </Card>
 
-      {items.length === 0 ? (
-        <Card>
-          <CardBody>
-            <EmptyState
-              title="Nothing set yet"
-              description="When a faculty member publishes an assessment for your class, it appears here."
-            />
-          </CardBody>
-        </Card>
-      ) : (
-        <ul className="space-y-4">
-          {items.map(({ assessment, attempts, availability }) => {
-            const latest = attempts[0];
-
-            return (
-              <li key={assessment.id}>
-                <Card as="section">
-                  <CardHeader
-                    title={assessment.title}
-                    description={assessment.description ?? undefined}
-                    eyebrow={assessmentKindLabel(assessment.kind)}
-                  />
-                  <CardBody className="space-y-3">
-                    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-faint">
-                      {assessment.durationMinutes && (
-                        <div>
-                          <dt className="inline">Time: </dt>
-                          <dd className="inline text-ink-muted">
-                            {assessment.durationMinutes} minutes
-                          </dd>
-                        </div>
-                      )}
-                      <div>
-                        <dt className="inline">Attempts: </dt>
-                        <dd className="inline text-ink-muted">
-                          {attempts.length} of {assessment.maxAttempts} used
-                        </dd>
-                      </div>
-                      {assessment.closesAt && (
-                        <div>
-                          <dt className="inline">Closes: </dt>
-                          <dd className="inline text-ink-muted">
-                            {new Date(assessment.closesAt).toLocaleString()}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-
-                    {latest && (
-                      <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-sm">
-                        <p className="text-ink-muted">
-                          Last attempt: {attemptStatusLabel(latest.status)}
-                          {latest.percentage !== null && (
-                            <>
-                              {" · "}
-                              <span className="font-medium tabular-nums text-indigo-900">
-                                {latest.percentage}%
-                              </span>
-                              {latest.passed !== null &&
-                                (latest.passed ? " · passed" : " · not passed")}
-                            </>
-                          )}
-                        </p>
-                        <Link
-                          href={`/assessments/${assessment.id}/attempt/${latest.id}`}
-                          className="rounded text-xs font-medium text-indigo-700 hover:underline"
-                        >
-                          {latest.status === "in_progress"
-                            ? "Continue this attempt"
-                            : "See your answers"}
-                        </Link>
-                      </div>
-                    )}
-
-                    {availability.open ? (
-                      <StartAttemptButton
-                        assessmentId={assessment.id}
-                        kind={assessment.kind}
-                        resuming={latest?.status === "in_progress"}
-                      />
-                    ) : (
-                      <p className="text-sm text-ink-faint">
-                        {AVAILABILITY_COPY[availability.reason]}
-                      </p>
-                    )}
-                  </CardBody>
-                </Card>
+      {/* --- External practice -------------------------------------------- */}
+      <Card as="section">
+        <CardHeader
+          title="External practice resources"
+          description="Optional practice on outside platforms. None of these send results back here — if you want a score on your profile, record it above."
+        />
+        <CardBody>
+          <ul className="space-y-2">
+            {EXTERNAL_PRACTICE.map((practice) => (
+              <li key={practice.url} className="flex flex-wrap items-baseline gap-x-2">
+                <a
+                  href={practice.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-indigo-700 hover:underline"
+                >
+                  {practice.label} ↗
+                </a>
+                <span className="text-xs text-ink-faint">{practice.provider}</span>
               </li>
-            );
-          })}
-        </ul>
-      )}
+            ))}
+          </ul>
+        </CardBody>
+      </Card>
     </div>
   );
 }

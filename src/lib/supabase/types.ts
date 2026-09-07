@@ -27,7 +27,18 @@ import type {
   AssessmentKind,
   QuestionKind,
   AttemptStatus,
+  SkillCategoryId,
 } from "@/config/assessments";
+
+/** `public.integrity_status` (0039). NULL means not assessed. */
+type IntegrityStatus = "low_risk" | "review_recommended";
+
+/** The client-reported signals `assessment_integrity_events` accepts (0039). */
+type IntegrityEventType =
+  | "tab_hidden"
+  | "tab_visible"
+  | "fullscreen_exit"
+  | "paste";
 import type {
   AchievementCategory,
   AchievementLevel,
@@ -787,9 +798,11 @@ export type Database = {
           is_published: boolean;
           created_at: string;
           updated_at: string;
+          skill_category: SkillCategoryId | null;
         };
         Insert: {
           title: string;
+          skill_category?: SkillCategoryId | null;
           description?: string | null;
           kind?: AssessmentKind;
           created_by?: string | null;
@@ -818,6 +831,7 @@ export type Database = {
           pass_percentage: number | null;
           randomise_questions: boolean;
           is_published: boolean;
+          skill_category: SkillCategoryId | null;
         }>;
         Relationships: [];
       };
@@ -893,6 +907,11 @@ export type Database = {
           graded_at: string | null;
           created_at: string;
           updated_at: string;
+          correct_count: number | null;
+          wrong_count: number | null;
+          unanswered_count: number | null;
+          time_taken_seconds: number | null;
+          integrity_status: IntegrityStatus | null;
         };
         Insert: {
           assessment_id: string;
@@ -908,7 +927,27 @@ export type Database = {
           percentage: number | null;
           passed: boolean | null;
           graded_at: string | null;
+          correct_count: number | null;
+          wrong_count: number | null;
+          unanswered_count: number | null;
+          time_taken_seconds: number | null;
+          integrity_status: IntegrityStatus | null;
         }>;
+        Relationships: [];
+      };
+      assessment_integrity_events: {
+        Row: {
+          id: string;
+          attempt_id: string;
+          event_type: IntegrityEventType;
+          occurred_at: string;
+        };
+        Insert: {
+          attempt_id: string;
+          event_type: IntegrityEventType;
+          occurred_at?: string;
+        };
+        Update: Partial<{ event_type: IntegrityEventType }>;
         Relationships: [];
       };
       student_answers: {
