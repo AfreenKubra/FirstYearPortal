@@ -43,7 +43,6 @@ export function RadarChart({ data }: { data: RadarAxis[] }) {
     <Card as="section">
       <CardHeader
         title="Profile and progress"
-        description="How much of your goals, domains, and interests you've set, alongside how far your roadmap and assessments have actually gone."
       />
       <CardBody>
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">

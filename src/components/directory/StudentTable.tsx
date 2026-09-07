@@ -121,9 +121,9 @@ export function StudentTable({
                               way so the name column does not jog about. */}
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-100 bg-indigo-50 text-[0.625rem] font-semibold text-indigo-800">
                             {student.photoUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- signed
-                              // Supabase URL that expires hourly; next/image would
-                              // cache a URL already dead by the time it served it.
+                              /* Signed Supabase URL, expires hourly — next/image
+                                 would cache a URL already dead when served. */
+                              // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={student.photoUrl}
                                 alt=""

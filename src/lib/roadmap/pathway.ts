@@ -51,6 +51,52 @@ export type Pathway = {
 
 export type SelectionOption = { id: number; name: string; isPrimary: boolean };
 
+/** The semesters each stage covers, for placing curated material. */
+const STAGE_SEMESTERS: Record<PathwayStageId, [number, number]> = {
+  foundation: [1, 2],
+  core: [3, 4],
+  specialize: [5, 6],
+  career_ready: [7, 8],
+};
+
+type StageResource = {
+  semester: number | null;
+  goalIds: number[];
+  domainIds: number[];
+};
+
+/**
+ * The catalogue entries a given stage should show.
+ *
+ * Two conditions, both required. The entry must be tagged to the student's
+ * primary goal or primary domain — an untagged resource is not evidence of
+ * anything, and rolling it in would make every stage grow whenever an
+ * unrelated entry was added. And it must belong to this stage: an entry
+ * carrying a semester appears at the stage covering it, while one with no
+ * semester recorded appears at every stage, because "applies throughout" is
+ * what an unset semester actually means. Guessing a stage for it would be
+ * inventing a placement nobody entered.
+ *
+ * Pure, so the placement rule can be tested without a database.
+ */
+export function resourcesForStage<T extends StageResource>(
+  resources: readonly T[],
+  stage: PathwayStageId,
+  primary: { goalId: number | null; domainId: number | null },
+): T[] {
+  const [from, to] = STAGE_SEMESTERS[stage];
+
+  return resources.filter((resource) => {
+    const tagged =
+      (primary.domainId !== null && resource.domainIds.includes(primary.domainId)) ||
+      (primary.goalId !== null && resource.goalIds.includes(primary.goalId));
+    if (!tagged) return false;
+
+    if (resource.semester === null) return true;
+    return resource.semester >= from && resource.semester <= to;
+  });
+}
+
 /**
  * Which selected goal/domain is "primary," for building the timeline.
  *

@@ -136,16 +136,10 @@ export function ExamTrackPanel({
         return (
           <Card as="article" key={exam.id}>
             <CardHeader
-              eyebrow={
-                resourceKindLabel(exam.kind) +
-                (exam.provider ? ` · ${exam.provider}` : "")
-              }
+              // Kind only: the provider was dropped at the college's request,
+              // since naming one institution read as an endorsement of it.
+              eyebrow={resourceKindLabel(exam.kind)}
               title={exam.title}
-              description={
-                goalNames.length > 0
-                  ? `Tagged to ${goalNames.join(", ")}.`
-                  : undefined
-              }
               action={
                 <span
                   title={exam.isVerified ? VERIFIED_NOTICE : UNVERIFIED_NOTICE}

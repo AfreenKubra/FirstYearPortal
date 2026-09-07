@@ -78,9 +78,9 @@ function AccountCard({
             same space, or the rows jog left and right down the list. */}
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-indigo-100 bg-indigo-50 text-sm font-semibold text-indigo-800">
           {account.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- signed
-            // Supabase URL, expires hourly; not a candidate for next/image's
-            // optimiser, which would cache a URL that has already expired.
+            /* Signed Supabase URL, expires hourly — next/image would
+               cache a URL already dead by the time it served it. */
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={account.photoUrl}
               alt=""

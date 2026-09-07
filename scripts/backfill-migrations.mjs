@@ -159,6 +159,19 @@ const SIGNATURES = [
     "0036_profile_photos.sql",
     `select exists (select 1 from storage.buckets where id='profile-photos')`,
   ],
+  [
+    "0037_directory_profile_photo.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='student_directory'
+         and column_name='profile_photo_url')`,
+  ],
+  [
+    "0038_resource_semester_range.sql",
+    `select exists (select 1 from pg_constraint
+       where conrelid='public.resources'::regclass
+         and conname='resources_semester_check'
+         and pg_get_constraintdef(oid) like '%<= 8%')`,
+  ],
 ];
 
 async function main() {

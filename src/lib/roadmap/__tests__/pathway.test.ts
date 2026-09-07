@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildPathway, resolvePrimary, stageForSemester } from "../pathway";
+import {
+  buildPathway,
+  resolvePrimary,
+  resourcesForStage,
+  stageForSemester,
+} from "../pathway";
 
 /**
  * The pathway makes no claim about what a student has done — that is the
@@ -146,5 +151,53 @@ describe("resolvePrimary", () => {
 
   it("returns the only option when there is exactly one", () => {
     expect(resolvePrimary([{ id: 9, name: "solo", isPrimary: false }])?.name).toBe("solo");
+  });
+});
+
+describe("resourcesForStage", () => {
+  const res = (
+    over: Partial<{ semester: number | null; goalIds: number[]; domainIds: number[]; id: string }>,
+  ) => ({ id: "r", semester: null, goalIds: [], domainIds: [], ...over });
+
+  const PRIMARY = { goalId: 7, domainId: 4 };
+
+  it("shows an entry tagged to the primary domain at its own stage", () => {
+    const rows = [res({ id: "sem3", semester: 3, domainIds: [4] })];
+    expect(resourcesForStage(rows, "core", PRIMARY).map((r) => r.id)).toEqual(["sem3"]);
+    expect(resourcesForStage(rows, "foundation", PRIMARY)).toEqual([]);
+  });
+
+  it("matches on the primary goal as well as the domain", () => {
+    const rows = [res({ id: "goal", semester: 1, goalIds: [7] })];
+    expect(resourcesForStage(rows, "foundation", PRIMARY).map((r) => r.id)).toEqual(["goal"]);
+  });
+
+  it("excludes an entry tagged to neither, however well it fits the semester", () => {
+    const rows = [res({ id: "other", semester: 1, domainIds: [99], goalIds: [99] })];
+    expect(resourcesForStage(rows, "foundation", PRIMARY)).toEqual([]);
+  });
+
+  it("shows an entry with no semester at every stage", () => {
+    // An unset semester means "applies throughout" — inventing a stage for it
+    // would be a placement nobody entered.
+    const rows = [res({ id: "any", semester: null, domainIds: [4] })];
+    for (const stage of ["foundation", "core", "specialize", "career_ready"] as const) {
+      expect(resourcesForStage(rows, stage, PRIMARY).map((r) => r.id)).toEqual(["any"]);
+    }
+  });
+
+  it("places each semester in the right stage", () => {
+    const rows = [1, 2, 3, 4, 5, 6, 7, 8].map((s) =>
+      res({ id: `s${s}`, semester: s, domainIds: [4] }),
+    );
+    expect(resourcesForStage(rows, "foundation", PRIMARY).map((r) => r.id)).toEqual(["s1", "s2"]);
+    expect(resourcesForStage(rows, "core", PRIMARY).map((r) => r.id)).toEqual(["s3", "s4"]);
+    expect(resourcesForStage(rows, "specialize", PRIMARY).map((r) => r.id)).toEqual(["s5", "s6"]);
+    expect(resourcesForStage(rows, "career_ready", PRIMARY).map((r) => r.id)).toEqual(["s7", "s8"]);
+  });
+
+  it("returns nothing when the student has no primary goal or domain", () => {
+    const rows = [res({ id: "x", semester: 1, domainIds: [4], goalIds: [7] })];
+    expect(resourcesForStage(rows, "foundation", { goalId: null, domainId: null })).toEqual([]);
   });
 });

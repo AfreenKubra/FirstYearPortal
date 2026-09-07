@@ -2,15 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card, CardBody, EmptyState } from "@/components/ui/Card";
 import { RoadmapView } from "@/components/roadmap/RoadmapView";
-import { RoadmapAnalysis } from "@/components/roadmap/RoadmapAnalysis";
 import { ExamTrackPanel } from "@/components/roadmap/ExamTrackPanel";
-import {
-  DomainCourseShelf,
-  type DomainShelf,
-} from "@/components/roadmap/DomainCourseShelf";
+import { GoalTrackPanel } from "@/components/roadmap/GoalTrackPanel";
 import { getOwnStudent, getLookups, getProfileSnapshot } from "@/lib/queries/student";
 import { getOwnRoadmap, roadmapProgress } from "@/lib/queries/roadmaps";
-import { getDepartmentStats } from "@/lib/queries/vtu";
 import { refreshOwnRoadmap } from "@/lib/roadmap/refresh";
 import {
   filterExamResourcesForGoals,
@@ -21,7 +16,7 @@ import { countUpcomingEventsByTag } from "@/lib/queries/events";
 import { getOwnAssessmentAverage } from "@/lib/queries/external-scores";
 import { buildRadarData } from "@/lib/roadmap/radar";
 import { RadarChart } from "@/components/roadmap/RadarChart";
-import { getDomainSelections, getGoalSelections, getPathwayEvidence } from "@/lib/queries/pathway";
+import { getDomainSelections, getGoalSelections } from "@/lib/queries/pathway";
 import { buildPathway, resolvePrimary } from "@/lib/roadmap/pathway";
 import { CareerPathwayTimeline } from "@/components/roadmap/CareerPathwayTimeline";
 
@@ -39,11 +34,10 @@ export default async function StudentRoadmapPage() {
   // should see the consequence on this page load, not the next one.
   const refresh = await refreshOwnRoadmap();
 
-  const [roadmap, lookups, snapshot, departmentStats] = await Promise.all([
+  const [roadmap, lookups, snapshot] = await Promise.all([
     getOwnRoadmap(),
     getLookups(),
     getProfileSnapshot(student),
-    getDepartmentStats(student.departmentCode),
   ]);
 
   const nameById = (
@@ -54,7 +48,6 @@ export default async function StudentRoadmapPage() {
     return ids.map((id) => map.get(id)).filter(Boolean) as string[];
   };
 
-  const chosenDomains = nameById(lookups.domains, snapshot.domainIds);
   const chosenGoals = nameById(lookups.goals, snapshot.goalIds);
 
   /**
@@ -70,7 +63,7 @@ export default async function StudentRoadmapPage() {
    * unrelated event was published, and "3 workshops for your goal" would stop
    * being true the moment it was most useful.
    */
-  const [catalogue, workshopsOnCalendar, assessmentAverage, goalSelections, domainSelections, pathwayEvidence] =
+  const [catalogue, workshopsOnCalendar, assessmentAverage, goalSelections, domainSelections] =
     await Promise.all([
       listResources(),
       countUpcomingEventsByTag({
@@ -81,7 +74,6 @@ export default async function StudentRoadmapPage() {
       getOwnAssessmentAverage(),
       getGoalSelections(student.id),
       getDomainSelections(student.id),
-      getPathwayEvidence(student.id),
     ]);
 
   // The career pathway timeline: independent of the AI/rule-based roadmap
@@ -126,38 +118,6 @@ export default async function StudentRoadmapPage() {
     ["workshop"],
   ).length;
 
-  // One shelf per domain the student picked, in the order the lookup returns
-  // them. Domains with nothing tagged are kept as empty shelves so the panel
-  // can name the gap rather than quietly omitting the domain.
-  const shelves: DomainShelf[] = snapshot.domainIds
-    .map((id) => {
-      const domain = lookups.domains.find((d) => d.id === id);
-      if (!domain) return null;
-      return {
-        domain: domain.name,
-        resources: filterResourcesForDomains(catalogue, [id]),
-      };
-    })
-    .filter((s): s is DomainShelf => s !== null);
-
-  // Real counts for the pathway's "Recommended for your journey" cards —
-  // the same catalogue `DomainCourseShelf` reads below, just counted by kind
-  // for the primary domain rather than listed in full a second time.
-  const primaryDomainResources = primaryDomain
-    ? filterResourcesForDomains(catalogue, [primaryDomain.id])
-    : [];
-  const courseCount = primaryDomainResources.filter((r) => r.kind === "course").length;
-  const certificationCount = primaryDomainResources.filter(
-    (r) => r.kind === "certification",
-  ).length;
-
-  // Phrased as the student would describe the section, not as column names.
-  const profileGaps = [
-    snapshot.goalIds.length === 0 ? "Career goals" : null,
-    snapshot.domainIds.length === 0 ? "Technical domains" : null,
-    snapshot.interestIds.length === 0 ? "Areas of interest" : null,
-  ].filter(Boolean) as string[];
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
@@ -187,11 +147,8 @@ export default async function StudentRoadmapPage() {
           primaryDomain={primaryDomain}
           secondaryDomainNames={secondaryDomainNames}
           pathway={pathway}
-          evidence={pathwayEvidence}
+          resources={catalogue}
           semester={recordedSemester}
-          courseCount={courseCount}
-          certificationCount={certificationCount}
-          workshopCount={workshopsOnCalendar}
         />
       )}
 
@@ -208,9 +165,13 @@ export default async function StudentRoadmapPage() {
         <>
           <RadarChart data={radarData} />
 
-          {/* Above the milestones: a date you can miss outranks a plan you can
-              do at any time. Renders nothing at all when no dated exam is
-              tagged to the student's goals. */}
+          {/* The goal's own track: what it asks of the student, and the
+              official sources that own the specifics. Renders for every goal,
+              including the seven that have no exam at all. */}
+          {primaryGoal && <GoalTrackPanel goalName={primaryGoal.name} />}
+
+          {/* A dated exam you can miss outranks a plan you can do any time, so
+              it sits high. Renders nothing when no dated exam is tagged. */}
           <ExamTrackPanel
             exams={exams}
             goalNames={chosenGoals}
@@ -218,18 +179,7 @@ export default async function StudentRoadmapPage() {
             workshopsInCatalogue={workshopsInCatalogue}
           />
 
-          <RoadmapAnalysis
-            roadmap={roadmap}
-            chosenDomains={chosenDomains}
-            department={student.departmentCode}
-            departmentStats={departmentStats}
-            profileGaps={profileGaps}
-          />
-
           <RoadmapView roadmap={roadmap} interactive />
-
-          {/* Below: reference material, browsed rather than scheduled. */}
-          <DomainCourseShelf shelves={shelves} chosenDomains={chosenDomains} />
         </>
       )}
     </div>

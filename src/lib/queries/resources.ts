@@ -11,7 +11,6 @@ import {
   filterExamResourcesForGoals,
   filterResourcesForDomains,
 } from "@/lib/resources/filters";
-import { tagCoverage, type TagCoverage } from "@/lib/resources/coverage";
 import type { ResourceKind } from "@/config/resources";
 
 /**
@@ -223,48 +222,6 @@ export async function getSavedResourceIds(): Promise<Set<string>> {
     .from("student_resources")
     .select("resource_id");
   return new Set((data ?? []).map((r) => r.resource_id));
-}
-
-/**
- * Per-tag counts of students waiting and catalogue entries answering them.
- *
- * The roadmap's course shelf and exam track render from tags, so a tag nothing
- * carries produces an empty panel for every student who chose it. That is
- * correct behaviour — the alternative is showing untagged material under a
- * heading naming their domain — but it is invisible from the admin side, where
- * the catalogue looks fine. This turns it into a work queue ordered by how
- * many students are affected.
- *
- * Reads the join tables directly rather than the directory view: the counts
- * needed are per-tag, not per-student, and pulling the whole directory to
- * derive them would be far more data for a number.
- */
-export async function getTagCoverage(): Promise<TagCoverage[]> {
-  const supabase = createClient();
-
-  const [goalOpts, domainOpts, studentGoals, studentDomains, resources] =
-    await Promise.all([
-      supabase.from("career_goals").select("id, name"),
-      supabase.from("technical_domains").select("id, name"),
-      supabase.from("student_goals").select("goal_id"),
-      supabase.from("student_domains").select("domain_id"),
-      listResources(),
-    ]);
-
-  return [
-    ...tagCoverage(
-      goalOpts.data ?? [],
-      "goal",
-      (studentGoals.data ?? []).map((r) => r.goal_id),
-      resources.flatMap((r) => r.goalIds),
-    ),
-    ...tagCoverage(
-      domainOpts.data ?? [],
-      "domain",
-      (studentDomains.data ?? []).map((r) => r.domain_id),
-      resources.flatMap((r) => r.domainIds),
-    ),
-  ];
 }
 
 /** Count for the admin badge: entries nobody has checked yet. */

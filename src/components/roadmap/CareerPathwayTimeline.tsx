@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useFormState } from "react-dom";
-import { Card, CardBody, CardHeader, StatTile, Tag } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader, Tag } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { idleState, type ActionState } from "@/lib/actions/form-state";
 import { setPrimaryDomain, setPrimaryGoal } from "@/lib/actions/pathway";
-import type { Pathway, PathwayItem, SelectionOption } from "@/lib/roadmap/pathway";
-import type { EvidenceEntry } from "@/lib/queries/pathway";
+import {
+  resourcesForStage,
+  type Pathway,
+  type PathwayItem,
+  type SelectionOption,
+} from "@/lib/roadmap/pathway";
+import { costLabel, resourceKindLabel } from "@/config/resources";
+import type { Resource } from "@/lib/queries/resources";
 import type { LookupOption } from "@/lib/queries/student";
 
 const STAGE_MUTED = "opacity-55";
@@ -119,8 +124,8 @@ function FocusCard({
  * One skill or activity in a stage — guidance only.
  *
  * There is no checkbox here on purpose. Ticking one used to feed a progress
- * percentage that nobody had verified; what a student has actually done is
- * shown in the evidence panel below, from records somebody else confirmed.
+ * percentage that nobody had verified — a claim about the student derived
+ * purely from their own say-so.
  */
 function StageItem({ item }: { item: PathwayItem }) {
   return (
@@ -146,6 +151,67 @@ function StageItem({ item }: { item: PathwayItem }) {
 }
 
 /**
+ * The curated study material and tests for one stage.
+ *
+ * Everything here is a real catalogue entry an administrator added and tagged
+ * — nothing is generated, and nothing appears until somebody curates it. That
+ * is why the empty state names the gap rather than staying silent: a student
+ * seeing nothing should know it means "nobody has added material for this
+ * yet", not "there is nothing worth studying".
+ *
+ * Cost carries its three states and the checked badge travels with each
+ * entry, exactly as on the course shelf below — a student is being asked to
+ * spend time and possibly money on these links.
+ */
+function StageMaterial({
+  resources,
+  domainName,
+}: {
+  resources: Resource[];
+  domainName: string;
+}) {
+  if (resources.length === 0) {
+    return (
+      <p className="border-t border-indigo-100/70 pt-3 text-xs leading-relaxed text-ink-faint">
+        No study material has been added for this stage of {domainName} yet.
+        Worth asking your mentor — the portal only shows what somebody has
+        deliberately curated.
+      </p>
+    );
+  }
+
+  return (
+    <div className="border-t border-indigo-100/70 pt-3">
+      <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-brass-700">
+        Study material &amp; tests
+      </p>
+      <ul className="space-y-1.5">
+        {resources.map((resource) => {
+          const cost = costLabel(resource.isFree);
+          return (
+            <li key={resource.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-indigo-700 hover:underline"
+              >
+                {resource.title} ↗
+              </a>
+              <span className="text-xs text-ink-faint">
+                {resourceKindLabel(resource.kind)}
+                {resource.provider ? ` · ${resource.provider}` : ""} · {cost.label}
+                {resource.isVerified ? "" : " · not checked"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * The semester-wise career pathway — a new section above the existing
  * AI/mentor-reviewed roadmap, not a replacement for it.
  *
@@ -163,11 +229,8 @@ export function CareerPathwayTimeline({
   primaryDomain,
   secondaryDomainNames,
   pathway,
-  evidence,
+  resources,
   semester,
-  courseCount,
-  certificationCount,
-  workshopCount,
 }: {
   /** The student's own selections, with which one is primary. */
   goalOptions: SelectionOption[];
@@ -179,11 +242,9 @@ export function CareerPathwayTimeline({
   primaryDomain: SelectionOption | null;
   secondaryDomainNames: string[];
   pathway: Pathway;
-  evidence: EvidenceEntry[];
+  /** The catalogue, for the per-stage study material. */
+  resources: Resource[];
   semester: number | null;
-  courseCount: number;
-  certificationCount: number;
-  workshopCount: number;
 }) {
   const [openStage, setOpenStage] = useState<string | null>(
     pathway.currentStageId ?? pathway.stages[0]?.id ?? null,
@@ -224,20 +285,6 @@ export function CareerPathwayTimeline({
             />
           </div>
 
-          <p className="text-sm text-ink-muted">
-            {semester !== null ? (
-              <>
-                You are in <span className="font-medium text-indigo-950">semester {semester}</span>,
-                which puts you in the stage marked below. This map is guidance — it makes no claim
-                about what you have done.
-              </>
-            ) : (
-              <>
-                Your semester isn&apos;t on file, so no stage is marked as yours. Add it to your
-                academic profile and the map will show where you are.
-              </>
-            )}
-          </p>
         </CardBody>
       </Card>
 
@@ -317,13 +364,23 @@ export function CareerPathwayTimeline({
                     </span>
                   </button>
 
-                  {isOpen && stage.items.length > 0 && (
-                    <div className="ml-11 mt-1 rounded-lg border border-indigo-100 bg-parchment-sunk/40 px-3.5 py-3">
-                      <ul className="divide-y divide-indigo-100/70">
-                        {stage.items.map((item) => (
-                          <StageItem key={item.id} item={item} />
-                        ))}
-                      </ul>
+                  {isOpen && (
+                    <div className="ml-11 mt-1 space-y-3 rounded-lg border border-indigo-100 bg-parchment-sunk/40 px-3.5 py-3">
+                      {stage.items.length > 0 && (
+                        <ul className="divide-y divide-indigo-100/70">
+                          {stage.items.map((item) => (
+                            <StageItem key={item.id} item={item} />
+                          ))}
+                        </ul>
+                      )}
+
+                      <StageMaterial
+                        resources={resourcesForStage(resources, stage.id, {
+                          goalId: primaryGoal.id,
+                          domainId: primaryDomain.id,
+                        })}
+                        domainName={primaryDomain.name}
+                      />
                     </div>
                   )}
                 </div>
@@ -341,58 +398,6 @@ export function CareerPathwayTimeline({
         </CardBody>
       </Card>
 
-      <Card as="section">
-        <CardHeader
-          title="What's on your record"
-          description="Only things somebody other than you has confirmed. Nothing here can be ticked off by hand."
-        />
-        <CardBody>
-          <ul className="divide-y divide-indigo-100">
-            {evidence.map((entry) => (
-              <li
-                key={entry.label}
-                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5"
-              >
-                <span className="text-sm text-ink">{entry.label}</span>
-                <span className="flex items-baseline gap-2">
-                  <span className="font-display text-base tabular-nums text-indigo-950">
-                    {entry.value}
-                  </span>
-                  <span className="text-xs text-ink-faint">{entry.source}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            A zero here means nothing has been recorded yet — not that you have done nothing.
-            Self-reported test scores are deliberately left out; they appear on{" "}
-            <Link href="/assessments" className="text-indigo-700 hover:underline">
-              your assessments page
-            </Link>{" "}
-            with their own unverified label.
-          </p>
-        </CardBody>
-      </Card>
-
-      <Card as="section">
-        <CardHeader
-          title="Recommended for your journey"
-          description={`Real catalogue entries and events tagged to ${primaryDomain.name}.`}
-        />
-        <CardBody>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Link href="#domain-shelf">
-              <StatTile label="📚 Courses" value={String(courseCount)} hint="See below" />
-            </Link>
-            <Link href="#domain-shelf">
-              <StatTile label="📜 Certifications" value={String(certificationCount)} hint="See below" />
-            </Link>
-            <Link href="/events">
-              <StatTile label="🎤 Workshops & events" value={String(workshopCount)} hint="See /events" />
-            </Link>
-          </div>
-        </CardBody>
-      </Card>
     </div>
   );
 }
