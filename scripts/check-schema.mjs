@@ -208,6 +208,60 @@ const CHECKS = [
       return !error || error.code !== "PGRST202";
     },
   },
+  {
+    migration: "0032_external_test_scores.sql",
+    label: "self-reported external test scores",
+    probe: () => tableExists("external_test_scores"),
+  },
+  {
+    migration: "0033_college_calendar_events.sql",
+    label: "the college calendar",
+    probe: () => tableExists("college_calendar_events"),
+  },
+  {
+    migration: "0036_profile_photos.sql",
+    label: "the profile photo bucket",
+    probe: async () => {
+      const { data, error } = await db.storage.listBuckets();
+      return !error && (data ?? []).some((b) => b.id === "profile-photos");
+    },
+  },
+  {
+    migration: "0037_directory_profile_photo.sql",
+    label: "profile photos on the student directory",
+    probe: () => columnExists("student_directory", "profile_photo_url"),
+  },
+  {
+    migration: "0039_assessment_analytics.sql",
+    label: "skill categories and per-attempt counters",
+    probe: () => columnExists("assessments", "skill_category"),
+  },
+  {
+    migration: "0040_external_result_verification.sql",
+    label: "verify/reject on external results",
+    probe: () => columnExists("external_test_scores", "verification_status"),
+  },
+  {
+    migration: "0041_assessment_semester_range.sql",
+    label: "assessment audiences spanning a semester range",
+    probe: () => columnExists("assessments", "semester_min"),
+  },
+  {
+    // A probe on behaviour rather than on an object, because 0042 creates
+    // nothing — it restores an exemption 0039 had reverted. Anything that
+    // merely looked for a table would report this as applied on a database
+    // carrying the bug.
+    migration: "0042_restore_trusted_server_scoring.sql",
+    label: "the service-role exemption on attempt scoring",
+    probe: async () => {
+      const { data, error } = await db.rpc("is_trusted_server");
+      if (error && error.code === "PGRST202") return false;
+      // Called with the service role, so this must come back true. It being
+      // false would mean the function exists but no longer recognises the
+      // very caller the grading path runs as.
+      return data === true;
+    },
+  },
   // 0028_marks_released_notification.sql has no probe on purpose. It creates
   // only a trigger and its function, and PostgREST does not expose trigger
   // functions in its schema cache — `functionExists` returns PGRST202 for one
