@@ -1,6 +1,5 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import {
   cancelRegistration,
   registerForEvent,
@@ -8,6 +7,7 @@ import {
   submitFeedback,
 } from "@/lib/actions/events";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
@@ -18,7 +18,7 @@ export function RegisterButton({
   eventId: string;
   willWaitlist: boolean;
 }) {
-  const [state, formAction] = useFormState(registerForEvent, idleState);
+  const [state, formAction] = useActionState(registerForEvent, idleState);
 
   return (
     <form action={formAction} className="space-y-2">
@@ -34,7 +34,7 @@ export function RegisterButton({
 }
 
 export function CancelButton({ registrationId }: { registrationId: string }) {
-  const [state, formAction] = useFormState(cancelRegistration, idleState);
+  const [state, formAction] = useActionState(cancelRegistration, idleState);
 
   return (
     <form action={formAction} className="space-y-2">
@@ -54,7 +54,7 @@ export function PublishEventToggle({
   eventId: string;
   isPublished: boolean;
 }) {
-  const [state, formAction] = useFormState(setEventPublished, idleState);
+  const [state, formAction] = useActionState(setEventPublished, idleState);
 
   return (
     <form action={formAction} className="space-y-1.5">
@@ -84,7 +84,7 @@ export function FeedbackForm({
   rating: number | null;
   comment: string | null;
 }) {
-  const [state, formAction] = useFormState(submitFeedback, idleState);
+  const [state, formAction] = useActionState(submitFeedback, idleState);
 
   return (
     <form action={formAction} className="space-y-2 border-t border-indigo-100 pt-3">

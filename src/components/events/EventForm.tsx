@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { createEvent, updateEvent } from "@/lib/actions/events";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { CheckboxGroup, Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { EVENT_KINDS } from "@/config/events";
@@ -41,7 +41,7 @@ export function EventForm({
   selectedGoalIds?: number[];
   selectedDomainIds?: number[];
 }) {
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     event ? updateEvent : createEvent,
     idleState,
   );

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { deleteAchievement } from "@/lib/actions/achievements";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Button } from "@/components/ui/Button";
 import { FormMessage } from "@/components/ui/FormStatus";
 import { AchievementForm } from "./AchievementForm";
@@ -72,7 +72,7 @@ export function EvidenceList({
  */
 export function AchievementCard({ achievement }: { achievement: Achievement }) {
   const [editing, setEditing] = useState(false);
-  const [state, formAction] = useFormState(deleteAchievement, idleState);
+  const [state, formAction] = useActionState(deleteAchievement, idleState);
 
   if (editing) {
     return (

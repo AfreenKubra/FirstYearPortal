@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { startAttempt } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import {
   PSYCHOMETRIC_CONSENT,
@@ -29,7 +29,7 @@ export function StartAttemptButton({
   kind: string;
   resuming: boolean;
 }) {
-  const [state, formAction] = useFormState(startAttempt, idleState);
+  const [state, formAction] = useActionState(startAttempt, idleState);
   const [consented, setConsented] = useState(false);
 
   const needsConsent = kind === "psychometric";

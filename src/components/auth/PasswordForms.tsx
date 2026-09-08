@@ -1,13 +1,13 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { requestPasswordReset, resetPassword } from "@/lib/actions/auth";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
 export function ForgotPasswordForm() {
-  const [state, formAction] = useFormState(requestPasswordReset, idleState);
+  const [state, formAction] = useActionState(requestPasswordReset, idleState);
 
   return (
     <form action={formAction} noValidate className="space-y-4">
@@ -28,7 +28,7 @@ export function ForgotPasswordForm() {
 }
 
 export function ResetPasswordForm() {
-  const [state, formAction] = useFormState(resetPassword, idleState);
+  const [state, formAction] = useActionState(resetPassword, idleState);
 
   return (
     <form action={formAction} noValidate className="space-y-4">

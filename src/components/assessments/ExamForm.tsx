@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { saveAnswers } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { PSYCHOMETRIC_DISCLOSURE } from "@/config/assessments";
@@ -32,7 +32,7 @@ export function ExamForm({
   existing: StoredAnswer[];
   isPsychometric: boolean;
 }) {
-  const [state, formAction] = useFormState(saveAnswers, idleState);
+  const [state, formAction] = useActionState(saveAnswers, idleState);
 
   const answerFor = (questionId: string) =>
     existing.find((a) => a.questionId === questionId);

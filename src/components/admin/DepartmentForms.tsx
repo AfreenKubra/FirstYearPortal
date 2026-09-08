@@ -1,13 +1,13 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { createDepartment, setDepartmentActive } from "@/lib/actions/admin";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
 export function CreateDepartmentForm() {
-  const [state, formAction] = useFormState(createDepartment, idleState);
+  const [state, formAction] = useActionState(createDepartment, idleState);
 
   return (
     <form action={formAction} noValidate className="space-y-4">
@@ -51,7 +51,7 @@ export function ToggleDepartmentForm({
   isActive: boolean;
   studentCount: number;
 }) {
-  const [state, formAction] = useFormState(setDepartmentActive, idleState);
+  const [state, formAction] = useActionState(setDepartmentActive, idleState);
 
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">

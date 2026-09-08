@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent } from "react";
-import { useFormState } from "react-dom";
 import { uploadProfilePhoto } from "@/lib/actions/profile-photo";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
 function initials(name: string) {
@@ -23,7 +23,7 @@ export function ProfilePhotoUpload({
   studentName: string;
   photoUrl: string | null;
 }) {
-  const [state, formAction] = useFormState(uploadProfilePhoto, idleState);
+  const [state, formAction] = useActionState(uploadProfilePhoto, idleState);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {

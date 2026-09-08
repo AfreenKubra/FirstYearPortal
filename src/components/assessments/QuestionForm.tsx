@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { addQuestion } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
@@ -21,7 +21,7 @@ const BLANK = { label: "", correct: false, score: "0" };
  * answer on a scale item, which is not a thing that exists.
  */
 export function QuestionForm({ assessmentId }: { assessmentId: string }) {
-  const [state, formAction] = useFormState(addQuestion, idleState);
+  const [state, formAction] = useActionState(addQuestion, idleState);
   const [kind, setKind] = useState<string>("single_choice");
   const [options, setOptions] = useState([{ ...BLANK }, { ...BLANK }]);
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { registerStaff } from "@/lib/actions/faculty";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { DESIGNATIONS } from "@/lib/validation/faculty";
 import { STAFF_ROLE_CHOICES, type StaffRole } from "@/config/roles";
 import { Select, TextInput } from "@/components/ui/Field";
@@ -22,7 +22,7 @@ export function StaffRegisterForm({
 }: {
   departments: Array<{ code: string; name: string }>;
 }) {
-  const [state, formAction] = useFormState(registerStaff, idleState);
+  const [state, formAction] = useActionState(registerStaff, idleState);
   const [role, setRole] = useState<StaffRole>("faculty");
   const errors = state.fieldErrors ?? {};
 

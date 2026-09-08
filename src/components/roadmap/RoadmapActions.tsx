@@ -1,12 +1,12 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import {
   generateRoadmapForStudent,
   reviewRoadmap,
   toggleMilestone,
 } from "@/lib/actions/roadmaps";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
@@ -17,7 +17,7 @@ export function GenerateRoadmapButton({
   studentId: string;
   hasExisting: boolean;
 }) {
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     generateRoadmapForStudent,
     idleState,
   );
@@ -47,7 +47,7 @@ export function GenerateRoadmapButton({
  * refused server-side — a rejection nobody can act on wastes everyone's time.
  */
 export function ReviewRoadmapForm({ roadmapId }: { roadmapId: string }) {
-  const [state, formAction] = useFormState(reviewRoadmap, idleState);
+  const [state, formAction] = useActionState(reviewRoadmap, idleState);
 
   return (
     <form action={formAction} className="space-y-3 border-t border-indigo-100 pt-4">
@@ -96,7 +96,7 @@ export function MilestoneToggle({
   done: boolean;
   title: string;
 }) {
-  const [state, formAction] = useFormState(toggleMilestone, idleState);
+  const [state, formAction] = useActionState(toggleMilestone, idleState);
 
   return (
     <form action={formAction}>

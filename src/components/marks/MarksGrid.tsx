@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { releaseComponent, saveMarks } from "@/lib/actions/marks";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { AUTHORSHIP_NOTICE, SUM_LABEL } from "@/config/marks";
@@ -31,8 +31,8 @@ export function MarksGrid({
   subjectLabel: string;
   grid: MarksGridData;
 }) {
-  const [state, formAction] = useFormState(saveMarks, idleState);
-  const [releaseState, releaseAction] = useFormState(
+  const [state, formAction] = useActionState(saveMarks, idleState);
+  const [releaseState, releaseAction] = useActionState(
     releaseComponent,
     idleState,
   );

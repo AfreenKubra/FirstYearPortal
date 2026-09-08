@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { addVtuSubject, setVtuSubjectActive } from "@/lib/actions/vtu";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { CheckboxGroup, Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import type { LookupOption } from "@/lib/queries/student";
@@ -23,7 +23,7 @@ export function VtuSubjectForm({
   departments: Array<{ code: string; name: string }>;
   domains: LookupOption[];
 }) {
-  const [state, formAction] = useFormState(addVtuSubject, idleState);
+  const [state, formAction] = useActionState(addVtuSubject, idleState);
   const errors = state.fieldErrors ?? {};
 
   return (
@@ -126,7 +126,7 @@ export function RetireSubjectButton({
   subjectId: string;
   isActive: boolean;
 }) {
-  const [state, formAction] = useFormState(setVtuSubjectActive, idleState);
+  const [state, formAction] = useActionState(setVtuSubjectActive, idleState);
 
   return (
     <form action={formAction} className="inline">

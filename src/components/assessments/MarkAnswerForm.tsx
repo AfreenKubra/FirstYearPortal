@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { gradeAnswer } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
@@ -26,7 +26,7 @@ export function MarkAnswerForm({
   currentPoints: number | null;
   currentRemarks: string | null;
 }) {
-  const [state, formAction] = useFormState(gradeAnswer, idleState);
+  const [state, formAction] = useActionState(gradeAnswer, idleState);
 
   return (
     <form action={formAction} className="space-y-2 border-t border-indigo-100 pt-3">

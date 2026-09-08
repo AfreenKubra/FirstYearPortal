@@ -1,11 +1,11 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import {
   assignSubjectTeacher,
   removeSubjectTeacher,
 } from "@/lib/actions/marks";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import type { SubjectAssignment } from "@/lib/queries/marks";
@@ -30,8 +30,8 @@ export function SubjectTeacherForm({
   faculty: Array<{ id: string; fullName: string; email: string; departmentCode: string }>;
   assignments: SubjectAssignment[];
 }) {
-  const [state, formAction] = useFormState(assignSubjectTeacher, idleState);
-  const [removeState, removeAction] = useFormState(
+  const [state, formAction] = useActionState(assignSubjectTeacher, idleState);
+  const [removeState, removeAction] = useActionState(
     removeSubjectTeacher,
     idleState,
   );

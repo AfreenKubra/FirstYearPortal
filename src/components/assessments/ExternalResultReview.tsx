@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { setExternalScoreVerdict } from "@/lib/actions/external-scores";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import {
@@ -40,7 +40,7 @@ function formatDate(iso: string | null): string {
  * the source of the number.
  */
 function VerdictRow({ score }: { score: ExternalScore }) {
-  const [state, formAction] = useFormState(setExternalScoreVerdict, idleState);
+  const [state, formAction] = useActionState(setExternalScoreVerdict, idleState);
   const status = externalVerificationLabel(score.verification);
 
   const percentage =

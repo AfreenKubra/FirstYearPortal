@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { createResource } from "@/lib/actions/resources";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { CheckboxGroup, Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { RESOURCE_KINDS, COST_OPTIONS } from "@/config/resources";
@@ -30,7 +30,7 @@ export function ResourceForm({
   /** Administrators can verify; everyone else adds it as unchecked. */
   canVerify: boolean;
 }) {
-  const [state, formAction] = useFormState(createResource, idleState);
+  const [state, formAction] = useActionState(createResource, idleState);
   const errors = state.fieldErrors ?? {};
 
   return (

@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { markAttendance } from "@/lib/actions/events";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { registrationLabel } from "@/config/events";
 import type { RosterEntry } from "@/lib/queries/events";
@@ -23,7 +23,7 @@ export function AttendanceForm({
   eventId: string;
   roster: RosterEntry[];
 }) {
-  const [state, formAction] = useFormState(markAttendance, idleState);
+  const [state, formAction] = useActionState(markAttendance, idleState);
 
   // Only people who held a seat can be present. A waitlisted student who was
   // never admitted is not "absent", they were never expected.

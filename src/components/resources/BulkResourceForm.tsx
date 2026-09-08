@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { createResourcesBulk } from "@/lib/actions/resources";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { BULK_EXAMPLE, BULK_TEMPLATE } from "@/lib/resources/bulk";
 import { RESOURCE_KINDS } from "@/config/resources";
@@ -35,7 +35,7 @@ export function BulkResourceForm({
   goals: LookupOption[];
   domains: LookupOption[];
 }) {
-  const [state, formAction] = useFormState(createResourcesBulk, idleState);
+  const [state, formAction] = useActionState(createResourcesBulk, idleState);
 
   return (
     <form action={formAction} className="space-y-4">

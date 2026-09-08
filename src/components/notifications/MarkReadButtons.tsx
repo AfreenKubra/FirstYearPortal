@@ -1,19 +1,19 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { markAllRead, markRead } from "@/lib/actions/notifications";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Button } from "@/components/ui/Button";
 
 /**
  * Read-state controls.
  *
  * Split out of the list so the list itself can stay focused on rendering —
- * and because each needs its own `useFormState`, which a server component
+ * and because each needs its own `useActionState`, which a server component
  * cannot hold.
  */
 export function MarkAllReadButton() {
-  const [, formAction] = useFormState(markAllRead, idleState);
+  const [, formAction] = useActionState(markAllRead, idleState);
 
   return (
     <form action={formAction}>
@@ -31,7 +31,7 @@ export function MarkReadButton({
   notificationId: string;
   title: string;
 }) {
-  const [, formAction] = useFormState(markRead, idleState);
+  const [, formAction] = useActionState(markRead, idleState);
 
   return (
     <form action={formAction}>

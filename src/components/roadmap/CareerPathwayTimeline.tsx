@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFormState } from "react-dom";
 import { Card, CardBody, CardHeader, Tag } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { idleState, type ActionState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { setPrimaryDomain, setPrimaryGoal } from "@/lib/actions/pathway";
 import {
   resourcesForStage,
@@ -48,7 +48,7 @@ function FocusCard({
   submitLabel: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(action, idleState);
+  const [state, formAction] = useActionState(action, idleState);
 
   // Close the editor once the change has actually saved, so the card returns
   // to showing the new selection rather than leaving the form hanging open.

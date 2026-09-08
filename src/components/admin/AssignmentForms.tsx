@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { createAssignment, deleteAssignment } from "@/lib/actions/admin";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
@@ -30,7 +30,7 @@ export function CreateAssignmentForm({
   faculty: FacultyOption[];
   departments: Array<{ code: string; name: string }>;
 }) {
-  const [state, formAction] = useFormState(createAssignment, idleState);
+  const [state, formAction] = useActionState(createAssignment, idleState);
   const [scopeType, setScopeType] = useState<"scope" | "student">("scope");
 
   if (faculty.length === 0) {
@@ -152,7 +152,7 @@ export function CreateAssignmentForm({
 }
 
 export function DeleteAssignmentForm({ id }: { id: string }) {
-  const [state, formAction] = useFormState(deleteAssignment, idleState);
+  const [state, formAction] = useActionState(deleteAssignment, idleState);
 
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">

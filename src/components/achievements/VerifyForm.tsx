@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { verifyAchievement } from "@/lib/actions/achievements";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage } from "@/components/ui/FormStatus";
 
 /**
@@ -20,7 +20,7 @@ export function VerifyForm({
   achievementId: string;
   studentName: string;
 }) {
-  const [state, formAction] = useFormState(verifyAchievement, idleState);
+  const [state, formAction] = useActionState(verifyAchievement, idleState);
 
   return (
     <form action={formAction} className="mt-4 space-y-3 border-t border-indigo-100 pt-4">

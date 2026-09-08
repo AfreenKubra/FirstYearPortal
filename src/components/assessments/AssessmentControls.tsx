@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { deleteQuestion, setPublished } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
 /**
@@ -22,7 +22,7 @@ export function PublishToggle({
   isPublished: boolean;
   questionCount: number;
 }) {
-  const [state, formAction] = useFormState(setPublished, idleState);
+  const [state, formAction] = useActionState(setPublished, idleState);
   const blocked = !isPublished && questionCount === 0;
 
   return (
@@ -58,7 +58,7 @@ export function RemoveQuestionButton({
   questionId: string;
   assessmentId: string;
 }) {
-  const [state, formAction] = useFormState(deleteQuestion, idleState);
+  const [state, formAction] = useActionState(deleteQuestion, idleState);
 
   return (
     <form action={formAction}>

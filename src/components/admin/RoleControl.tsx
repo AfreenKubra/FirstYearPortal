@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { setRoles } from "@/lib/actions/admin";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage } from "@/components/ui/FormStatus";
 import { ROLES, ROLE_LABELS, isAllowlistedAdmin, type Role } from "@/config/roles";
 
@@ -36,7 +36,7 @@ export function RoleControl({
   hasStaffRecord: boolean;
   isSelf?: boolean;
 }) {
-  const [state, formAction] = useFormState(setRoles, idleState);
+  const [state, formAction] = useActionState(setRoles, idleState);
 
   const available = ROLES.filter((role) => {
     if (role === "admin") return isAllowlistedAdmin(email);

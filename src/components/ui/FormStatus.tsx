@@ -58,8 +58,14 @@ export function SubmitButton({
  * `role="alert"` for errors, so an assistive-tech user hears the failure
  * immediately but is not interrupted by routine confirmations.
  */
-export function FormMessage({ state }: { state: ActionState }) {
-  if (state.status === "idle" || !state.message) return null;
+export function FormMessage({ state }: { state: ActionState | undefined }) {
+  // `state` is typed non-optional across the codebase, and was still arriving
+  // undefined: an action that ends in `redirect()` returns no value, and
+  // `useFormState` passes that straight through. `useActionState` now
+  // substitutes the idle state, so this should be unreachable — but this
+  // component is on nearly every form in the portal, and a crash here takes
+  // out the whole page rather than one banner. It is worth the two words.
+  if (!state || state.status === "idle" || !state.message) return null;
 
   const isError = state.status === "error";
 

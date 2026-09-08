@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { addExternalScore } from "@/lib/actions/external-scores";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
@@ -25,7 +25,7 @@ export function ExternalScoreForm({
   presetCategory?: string;
   presetPlatform?: string;
 } = {}) {
-  const [state, formAction] = useFormState(addExternalScore, idleState);
+  const [state, formAction] = useActionState(addExternalScore, idleState);
   const errors = state.fieldErrors ?? {};
   const today = new Date().toISOString().slice(0, 10);
 

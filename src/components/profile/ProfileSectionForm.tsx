@@ -1,10 +1,10 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { Select, TextInput, CheckboxGroup } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { idleState, type ActionState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import type { LookupOption } from "@/lib/queries/student";
 import { RESIDENCE_TYPES } from "@/config/residence";
 
@@ -45,7 +45,7 @@ export function PersonalSectionForm({
   defaults: PersonalDefaults;
   complete: boolean;
 }) {
-  const [state, formAction] = useFormState(action, idleState);
+  const [state, formAction] = useActionState(action, idleState);
 
   return (
     <Card as="section">
@@ -192,7 +192,7 @@ export function AcademicSectionForm({
   defaults: AcademicDefaults;
   complete: boolean;
 }) {
-  const [state, formAction] = useFormState(action, idleState);
+  const [state, formAction] = useActionState(action, idleState);
 
   return (
     <Card as="section">
@@ -307,7 +307,7 @@ export function SelectionSectionForm({
   complete: boolean;
   columns?: 1 | 2 | 3;
 }) {
-  const [state, formAction] = useFormState(action, idleState);
+  const [state, formAction] = useActionState(action, idleState);
 
   return (
     <Card as="section">

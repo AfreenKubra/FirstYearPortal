@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState } from "react-dom";
 import { createAchievement, updateAchievement } from "@/lib/actions/achievements";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
@@ -30,7 +30,7 @@ export function AchievementForm({
   onCancel?: () => void;
 }) {
   const isEdit = Boolean(existing);
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     isEdit ? updateAchievement : createAchievement,
     idleState,
   );

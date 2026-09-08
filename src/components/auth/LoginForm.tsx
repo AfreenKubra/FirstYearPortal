@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useFormState } from "react-dom";
 import { login } from "@/lib/actions/auth";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
@@ -14,7 +14,7 @@ import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
  * different role's dashboard.
  */
 export function LoginForm({ portal }: { portal?: string } = {}) {
-  const [state, formAction] = useFormState(login, idleState);
+  const [state, formAction] = useActionState(login, idleState);
 
   return (
     <form action={formAction} className="space-y-4">

@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { deleteExternalScore } from "@/lib/actions/external-scores";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage } from "@/components/ui/FormStatus";
 import { SELF_REPORTED_NOTICE, SKILL_CATEGORIES } from "@/config/assessments";
 import type { ExternalScore } from "@/lib/queries/external-scores";
@@ -14,7 +14,7 @@ function categoryLabel(id: string | null): string | null {
 
 /** One self-reported score, always shown with the not-verified notice attached. */
 export function ExternalScoreCard({ score }: { score: ExternalScore }) {
-  const [state, formAction] = useFormState(deleteExternalScore, idleState);
+  const [state, formAction] = useActionState(deleteExternalScore, idleState);
   const category = categoryLabel(score.category);
 
   return (

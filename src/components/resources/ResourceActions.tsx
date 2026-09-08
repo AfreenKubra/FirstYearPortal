@@ -1,12 +1,12 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import {
   setResourceActive,
   setResourceVerified,
   toggleSavedResource,
 } from "@/lib/actions/resources";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 
 export function SaveResourceButton({
@@ -16,7 +16,7 @@ export function SaveResourceButton({
   resourceId: string;
   saved: boolean;
 }) {
-  const [state, formAction] = useFormState(toggleSavedResource, idleState);
+  const [state, formAction] = useActionState(toggleSavedResource, idleState);
 
   return (
     <form action={formAction} className="space-y-1.5">
@@ -45,7 +45,7 @@ export function VerifyResourceButton({
   resourceId: string;
   isVerified: boolean;
 }) {
-  const [state, formAction] = useFormState(setResourceVerified, idleState);
+  const [state, formAction] = useActionState(setResourceVerified, idleState);
 
   return (
     <form action={formAction} className="space-y-1.5">
@@ -70,7 +70,7 @@ export function RetireResourceButton({
   resourceId: string;
   isActive: boolean;
 }) {
-  const [state, formAction] = useFormState(setResourceActive, idleState);
+  const [state, formAction] = useActionState(setResourceActive, idleState);
 
   return (
     <form action={formAction} className="space-y-1.5">

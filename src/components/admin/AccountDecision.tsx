@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { decideAccount } from "@/lib/actions/admin";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage } from "@/components/ui/FormStatus";
 
 /**
@@ -65,7 +65,7 @@ export function AccountDecision({
   name: string;
   isSelf?: boolean;
 }) {
-  const [state, formAction] = useFormState(decideAccount, idleState);
+  const [state, formAction] = useActionState(decideAccount, idleState);
 
   return (
     <form action={formAction} className="space-y-2">

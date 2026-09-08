@@ -1,8 +1,8 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { createAssessment, updateAssessment } from "@/lib/actions/assessments";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import { Select, TextInput } from "@/components/ui/Field";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
 import { ASSESSMENT_KINDS, SKILL_CATEGORIES } from "@/config/assessments";
@@ -34,7 +34,7 @@ export function AssessmentForm({
   /** Absent when creating. */
   assessment?: AssessmentSummary;
 }) {
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     assessment ? updateAssessment : createAssessment,
     idleState,
   );

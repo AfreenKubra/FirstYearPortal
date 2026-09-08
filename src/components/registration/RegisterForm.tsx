@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { useFormState } from "react-dom";
 import { registerStudent } from "@/lib/actions/auth";
 import { idleState } from "@/lib/actions/form-state";
+import { useActionState } from "@/lib/actions/use-action-state";
 import {
   accountStepSchema,
   householdStepSchema,
@@ -39,7 +39,7 @@ const STEPS = [
  * per-step on the client and again in full on the server.
  */
 export function RegisterForm({ departments, languages }: Props) {
-  const [state, formAction] = useFormState(registerStudent, idleState);
+  const [state, formAction] = useActionState(registerStudent, idleState);
   const [step, setStep] = useState(0);
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
