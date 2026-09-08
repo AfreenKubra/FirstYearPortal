@@ -1,0 +1,96 @@
+name: CI
+
+# Two jobs, split by what they need.
+#
+# `checks` needs nothing but the repository, so it is fast and runs on every
+# push. `rls` boots a real Postgres with Supabase's auth stack in Docker,
+# because a row-level-security policy only exists inside a database — there
+# is no way to assert on one without Postgres evaluating it.
+#
+# That second job is the reason this file exists. On 8 September 2026 a
+# migration restated `guard_attempt_scoring` from an outdated copy of itself
+# and dropped the service-role exemption a later migration had added, which
+# would have made assessment submission fail for every student. Typecheck,
+# lint and 534 unit tests passed throughout, and it reached production three
+# times. Only the RLS suite saw it, and only because someone ran it by hand.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  rls:
+    name: Migrations and RLS policies
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Boots Postgres, GoTrue, and PostgREST locally. No secrets and no
+      # cloud project: the whole stack is disposable and lives for this job.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Collect local credentials
+        run: |
+          set -euo pipefail
+          status="$(supabase status -o json)"
+          {
+            echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$status" | jq -r '.SERVICE_ROLE_KEY')"
+          } >> "$GITHUB_ENV"
+
+      # Applied by the project's own runner, so CI builds its database exactly
+      # the way production does. This step failing means the migrations no
+      # longer replay from empty — worth knowing on its own, and something
+      # nothing else checks.
+      - name: Apply migrations
+        run: npm run migrate
+
+      # Every migration should have a probe here. The script reports any it
+      # does not, so an omission is visible rather than passing quietly.
+      - name: Verify the schema matches the migrations
+        run: npm run check:schema
+
+      - name: RLS policy tests
+        run: npm run test:rls
+
+      - name: Supabase logs on failure
+        if: failure()
+        run: supabase status || true
