@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rls": "vitest run --config vitest.rls.config.ts",
+    "predeploy": "npm run typecheck && npm run lint && npm test && npm run test:rls",
     "migrate": "node scripts/migrate.mjs",
     "migrate:dry": "node scripts/migrate.mjs --dry",
     "check:schema": "node scripts/check-schema.mjs",

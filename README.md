@@ -397,9 +397,38 @@ table, assessment auto-grading, event registration rules, and
 resource recommendation matching, and
 roadmap generation and staleness detection.
 
-Integration, RLS-policy, and end-to-end tests are planned.
+RLS-policy tests live in `tests/rls/` and run separately:
+
+```bash
+npm run test:rls
+```
+
+They need a real database, so they are not part of `npm test`. Run them before
+every deploy — see [Deployment](#deployment). End-to-end tests are planned.
 
 ## Deployment
+
+### Before every deploy
+
+```bash
+npm run predeploy
+```
+
+Typecheck, lint, the unit suite, and **the RLS suite**. Do not deploy if it
+fails.
+
+The RLS suite is the reason this script exists. It needs `DATABASE_URL` and a
+service-role key, so it is deliberately kept out of `npm test` — but that also
+means nothing catches a broken policy or trigger unless somebody asks for it.
+On 8 September 2026 a migration restated `guard_attempt_scoring` from an
+outdated version of itself and dropped the service-role exemption a later
+migration had added. Assessment submission would have failed for every
+student. Typecheck, lint and 534 unit tests passed throughout; only the RLS
+suite saw it, and by then it had been deployed three times.
+
+It takes about two minutes, most of it the RLS suite creating real auth users.
+
+### Setting up on Vercel
 
 The app deploys to Vercel with no configuration beyond environment variables.
 
