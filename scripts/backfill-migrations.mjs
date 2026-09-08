@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { pgSslFor } from "../src/lib/db/ssl.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -211,7 +212,7 @@ async function main() {
 
   const client = new pg.Client({
     connectionString,
-    ssl: { rejectUnauthorized: false },
+    ssl: pgSslFor(connectionString),
   });
   await client.connect();
 

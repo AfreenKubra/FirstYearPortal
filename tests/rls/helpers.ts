@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { pgSslFor } from "@/lib/db/ssl";
 
 /**
  * Harness for the RLS suite.
@@ -59,7 +60,7 @@ export type Harness = {
 export async function connect(): Promise<Harness> {
   const client = new pg.Client({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: pgSslFor(process.env.DATABASE_URL),
   });
   await client.connect();
 
