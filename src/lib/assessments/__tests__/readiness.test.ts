@@ -10,7 +10,9 @@ import {
   performanceLevel,
   summariseCategory,
   summariseExternal,
+  toScoredAttempts,
   type ExternalResult,
+  type RawAttempt,
   type ScoredAttempt,
 } from "../readiness";
 
@@ -397,5 +399,71 @@ describe("summariseExternal", () => {
       "aptitude",
     );
     expect(summary.results.map((r) => r.id)).toEqual(["new", "mid", "old"]);
+  });
+});
+
+describe("toScoredAttempts", () => {
+  const raw = (over: Partial<RawAttempt> = {}): RawAttempt => ({
+    attemptNumber: 1,
+    status: "graded",
+    percentage: 78,
+    submittedAt: "2026-09-07T10:00:00Z",
+    correctCount: 16,
+    wrongCount: 4,
+    timeTakenSeconds: 960,
+    ...over,
+  });
+
+  it("reports a graded attempt", () => {
+    expect(toScoredAttempts([raw()])).toEqual([
+      {
+        attemptNumber: 1,
+        percentage: 78,
+        submittedAt: "2026-09-07T10:00:00Z",
+        correct: 16,
+        wrong: 4,
+        timeTakenSeconds: 960,
+      },
+    ]);
+  });
+
+  it("drops an attempt still being sat", () => {
+    // Counting it would add to the student's attempt total the moment they
+    // opened the paper, before answering anything.
+    expect(toScoredAttempts([raw({ status: "in_progress", percentage: null })])).toEqual([]);
+  });
+
+  it("drops an abandoned attempt", () => {
+    expect(toScoredAttempts([raw({ status: "abandoned" })])).toEqual([]);
+  });
+
+  it("keeps a submitted attempt that nobody has marked yet", () => {
+    // It counts as an attempt and shows in the history as awaiting marking,
+    // but carries no percentage, so it is never drawn as a score.
+    const [result] = toScoredAttempts([
+      raw({ status: "submitted", percentage: null }),
+    ]);
+    expect(result).toBeDefined();
+    expect(result.percentage).toBeNull();
+  });
+
+  it("feeds straight into a summary, so a submitted score reaches its card", () => {
+    // The end-to-end shape the dashboard depends on: raw rows in, a card's
+    // status/attempts/best/last out, with nothing typed in between.
+    const summary = summariseCategory(
+      "aptitude",
+      toScoredAttempts([
+        raw({ attemptNumber: 1, percentage: 61, submittedAt: "2026-09-01T09:00:00Z" }),
+        raw({ attemptNumber: 2, percentage: 78, submittedAt: "2026-09-07T09:00:00Z" }),
+        raw({ attemptNumber: 3, status: "in_progress", percentage: null }),
+      ]),
+    );
+
+    expect(summary.attemptCount).toBe(2);
+    expect(summary.latestPercentage).toBe(78);
+    expect(summary.bestPercentage).toBe(78);
+    expect(summary.level?.label).toBe("Strong");
+    expect(summary.lastAttemptAt).toBe("2026-09-07T09:00:00Z");
+    expect(summary.improvement).toBe(17);
   });
 });

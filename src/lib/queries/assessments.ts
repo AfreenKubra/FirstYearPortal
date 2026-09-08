@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { availability, type Availability } from "@/lib/assessments/grading";
+import { toScoredAttempts } from "@/lib/assessments/readiness";
 import type {
   AssessmentKind,
   AttemptStatus,
@@ -498,21 +499,9 @@ export async function getOwnCategoryResults(): Promise<{
     byCategory.set(categoryId, {
       categoryId,
       papers: [...existing.papers, item],
-      attempts: [
-        ...existing.attempts,
-        ...item.attempts
-          // An attempt still in progress has no result to report. Counting it
-          // would inflate the attempt total with a paper still being sat.
-          .filter((a) => a.status !== "in_progress" && a.status !== "abandoned")
-          .map((a) => ({
-            attemptNumber: a.attemptNumber,
-            percentage: a.percentage,
-            submittedAt: a.submittedAt,
-            correct: a.correctCount,
-            wrong: a.wrongCount,
-            timeTakenSeconds: a.timeTakenSeconds,
-          })),
-      ],
+      // Which attempts count is a rule, not a filter written here — see
+      // `toScoredAttempts`, which is where it is tested.
+      attempts: [...existing.attempts, ...toScoredAttempts(item.attempts)],
     });
   }
 

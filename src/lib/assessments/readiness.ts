@@ -366,3 +366,52 @@ export function summariseExternal(
     awaitingReview: mine.filter((r) => r.verification === "self_reported").length,
   };
 }
+
+/**
+ * Which attempt statuses have a result worth reporting.
+ *
+ * An attempt still open is not a result — counting it would add to a
+ * student's attempt total the moment they opened the paper, before they
+ * answered anything. An abandoned one is not a result either. Both are real
+ * rows that simply have nothing to say about performance yet.
+ *
+ * This is the rule that decides whether a score reaches its skill card at
+ * all, so it lives here where it can be tested rather than inline in a query.
+ */
+export const REPORTABLE_ATTEMPT_STATUSES = ["submitted", "graded"] as const;
+
+export function isReportableAttempt(status: string): boolean {
+  return (REPORTABLE_ATTEMPT_STATUSES as readonly string[]).includes(status);
+}
+
+/** A raw attempt row, in the shape the query layer returns. */
+export type RawAttempt = {
+  attemptNumber: number;
+  status: string;
+  percentage: number | null;
+  submittedAt: string | null;
+  correctCount: number | null;
+  wrongCount: number | null;
+  timeTakenSeconds: number | null;
+};
+
+/**
+ * Attempt rows reduced to what the dashboard reports.
+ *
+ * Marking state is preserved rather than flattened: an attempt that has been
+ * submitted but not yet marked keeps `percentage: null`, so it counts towards
+ * the attempt total and appears in the history as "Awaiting marking" without
+ * ever being drawn as a score.
+ */
+export function toScoredAttempts(
+  attempts: readonly RawAttempt[],
+): ScoredAttempt[] {
+  return attempts.filter((a) => isReportableAttempt(a.status)).map((a) => ({
+    attemptNumber: a.attemptNumber,
+    percentage: a.percentage,
+    submittedAt: a.submittedAt,
+    correct: a.correctCount,
+    wrong: a.wrongCount,
+    timeTakenSeconds: a.timeTakenSeconds,
+  }));
+}

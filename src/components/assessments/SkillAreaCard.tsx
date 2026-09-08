@@ -3,15 +3,12 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { ReadinessGauge } from "./ReadinessGauge";
 import { ProgressLineChart } from "./ProgressLineChart";
 import { StartAttemptButton } from "./StartAttemptButton";
-import { ExternalResultList } from "./ExternalResultList";
-import { AddExternalScorePanel } from "./ExternalScoreForm";
 import { AVAILABILITY_COPY } from "@/lib/assessments/grading";
-import { EXTERNAL_PRACTICE, UNSCORED_CATEGORY_ID } from "@/config/assessments";
+import { UNSCORED_CATEGORY_ID } from "@/config/assessments";
 import {
   buildTrend,
   improvementLabel,
   type CategorySummary,
-  type ExternalCategorySummary,
 } from "@/lib/assessments/readiness";
 import type { CategoryResults } from "@/lib/queries/assessments";
 
@@ -33,6 +30,13 @@ function formatDuration(seconds: number | null): string {
 /**
  * One skill area: its standing, its papers, and its history.
  *
+ * Every figure on it — status, attempts, best, last — is read from this
+ * student's own marked attempt rows. Nothing on this card is typed in by
+ * anyone: the student sits the paper, the engine marks it on submission, and
+ * the card is rebuilt from the result. There is deliberately no way to enter
+ * a score here, because a number a student typed and a number this portal
+ * marked would sit in the same place and look like the same fact.
+ *
  * "View analysis" and "attempt history" are `<details>` panels rather than
  * separate routes. The data is already on this page, so a round trip to
  * render it somewhere else would only add a URL to maintain — and this way
@@ -47,21 +51,15 @@ function formatDuration(seconds: number | null): string {
 export function SkillAreaCard({
   summary,
   results,
-  external,
 }: {
   summary: CategorySummary;
   results: CategoryResults | undefined;
-  /** What the student has recorded from outside this portal for this area. */
-  external: ExternalCategorySummary;
 }) {
   const papers = results?.papers ?? [];
   const attempts = results?.attempts ?? [];
   const trend = buildTrend(attempts);
   const improvement = improvementLabel(trend);
   const unscored = summary.categoryId === UNSCORED_CATEGORY_ID;
-  const practice = EXTERNAL_PRACTICE.find(
-    (p) => p.categoryId === summary.categoryId,
-  );
 
   // The first paper in this area that is actually open to sit. Papers exist
   // per area, so "Take assessment" has to point at one of them rather than
@@ -139,7 +137,8 @@ export function SkillAreaCard({
         {papers.length === 0 ? (
           <p className="rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-ink-muted">
             No {summary.label.toLowerCase()} paper has been published for your
-            class yet. It appears here as soon as one is.
+            class yet. It appears here as soon as one is, and your score fills
+            in on its own once you have sat it.
           </p>
         ) : openPaper ? (
           <StartAttemptButton
@@ -233,59 +232,6 @@ export function SkillAreaCard({
           </div>
         )}
 
-        {/* Outside practice, and what came back from it.
-            None of these platforms report results here, so the loop is
-            closed by the student: take the test, then record what you
-            scored, and it appears on this card straight away. Saying that
-            plainly is the alternative to a sync that does not exist. */}
-        {(practice || external.results.length > 0) && (
-          <div className="space-y-2 border-t border-indigo-100 pt-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-brass-700">
-                Outside this portal
-              </h4>
-              {external.bestVerifiedPercentage !== null && (
-                <span className="text-xs text-ink-muted">
-                  Best verified:{" "}
-                  <span className="font-medium tabular-nums text-indigo-900">
-                    {external.bestVerifiedPercentage}%
-                  </span>
-                </span>
-              )}
-            </div>
-
-            {practice && (
-              <p className="text-xs text-ink-faint">
-                <a
-                  href={practice.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-indigo-700 hover:underline"
-                >
-                  {practice.label} ↗
-                </a>{" "}
-                — {practice.provider}. Your score there does not reach this
-                portal on its own; record it below and it shows up here.
-              </p>
-            )}
-
-            <ExternalResultList summary={external} />
-
-            {external.awaitingReview > 0 && (
-              <p className="text-xs text-ink-faint">
-                {external.awaitingReview} result
-                {external.awaitingReview === 1 ? "" : "s"} waiting for a member
-                of staff to check.
-              </p>
-            )}
-
-            <AddExternalScorePanel
-              presetCategory={summary.categoryId}
-              presetPlatform={practice?.provider}
-              label="Record a result from this area"
-            />
-          </div>
-        )}
       </CardBody>
     </Card>
   );
