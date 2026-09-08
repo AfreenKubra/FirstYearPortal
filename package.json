@@ -2,7 +2,7 @@
   "name": "first-year-portal",
   "version": "1.0.0",
   "private": true,
-  "description": "First-Year Student Development and Analytics Portal — HKBK College of Engineering",
+  "description": "First-Year Student Development and Analytics Portal \u2014 HKBK College of Engineering",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -20,7 +20,9 @@
     "seed:students": "node scripts/seed-students.mjs",
     "seed:students:dry": "node scripts/seed-students.mjs --dry",
     "seed:resources": "node scripts/seed-resources.mjs",
-    "seed:resources:dry": "node scripts/seed-resources.mjs --dry"
+    "seed:resources:dry": "node scripts/seed-resources.mjs --dry",
+    "seed:questions": "node scripts/seed-question-banks.mjs",
+    "seed:questions:dry": "node scripts/seed-question-banks.mjs --dry"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
