@@ -39,6 +39,19 @@ let author: TempStaff;
 
 const papers: Record<string, string> = {};
 
+/**
+ * Papers this file created, deleted by id in `afterAll`.
+ *
+ * `cleanupFixtures` does not remove assessments, and an assessment's
+ * `created_by` is `on delete set null`, so deleting the fixture faculty
+ * leaves the paper behind — published, audience-matched, and visible to real
+ * students. Fifteen had accumulated in the shared database before anyone
+ * noticed. They are tracked by id rather than swept by title prefix, because
+ * every file shares that prefix and a sweep would delete rows another file is
+ * still using.
+ */
+const createdPaperIds: string[] = [];
+
 async function makePaper(
   name: string,
   scope: { semester_min?: number | null; semester_max?: number | null },
@@ -56,6 +69,7 @@ async function makePaper(
     .single();
   if (error) throw new Error(`${name}: ${error.message}`);
   papers[name] = data!.id;
+  createdPaperIds.push(data!.id);
 }
 
 /** Asks the database the same question RLS asks. */
@@ -93,6 +107,9 @@ describe.runIf(RLS_ENV_READY)("assessment audience by semester range", () => {
   }, 120_000);
 
   afterAll(async () => {
+    for (const id of createdPaperIds) {
+      await db.from("assessments").delete().eq("id", id);
+    }
     await cleanupFixtures(db);
     await client.end();
   });
