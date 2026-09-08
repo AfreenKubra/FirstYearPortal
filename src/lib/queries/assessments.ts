@@ -30,7 +30,9 @@ export type AssessmentSummary = {
   description: string | null;
   kind: AssessmentKind;
   departmentCode: string | null;
-  semester: number | null;
+  /** Inclusive semester span, or null for any semester. */
+  semesterMin: number | null;
+  semesterMax: number | null;
   section: string | null;
   opensAt: string | null;
   closesAt: string | null;
@@ -45,7 +47,7 @@ export type AssessmentSummary = {
 };
 
 const ASSESSMENT_COLUMNS =
-  "id, title, description, kind, department_code, semester, section, opens_at, closes_at, duration_minutes, max_attempts, pass_percentage, randomise_questions, is_published, created_at, skill_category" as const;
+  "id, title, description, kind, department_code, semester_min, semester_max, section, opens_at, closes_at, duration_minutes, max_attempts, pass_percentage, randomise_questions, is_published, created_at, skill_category" as const;
 
 type AssessmentDbRow = {
   id: string;
@@ -53,7 +55,8 @@ type AssessmentDbRow = {
   description: string | null;
   kind: AssessmentKind;
   department_code: string | null;
-  semester: number | null;
+  semester_min: number | null;
+  semester_max: number | null;
   section: string | null;
   opens_at: string | null;
   closes_at: string | null;
@@ -73,7 +76,8 @@ function mapAssessment(row: AssessmentDbRow): AssessmentSummary {
     description: row.description,
     kind: row.kind,
     departmentCode: row.department_code,
-    semester: row.semester,
+    semesterMin: row.semester_min,
+    semesterMax: row.semester_max,
     section: row.section,
     opensAt: row.opens_at,
     closesAt: row.closes_at,

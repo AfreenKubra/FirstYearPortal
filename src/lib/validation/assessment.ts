@@ -45,7 +45,8 @@ export const assessmentSchema = z
       errorMap: () => ({ message: "Choose an assessment type." }),
     }),
     departmentCode: optionalText(10),
-    semester: optionalNumber(1, 8, "Semester must be between 1 and 8."),
+    semesterMin: optionalNumber(1, 8, "Semester must be between 1 and 8."),
+    semesterMax: optionalNumber(1, 8, "Semester must be between 1 and 8."),
     section: optionalText(4),
     opensAt: optionalTimestamp,
     closesAt: optionalTimestamp,
@@ -65,6 +66,23 @@ export const assessmentSchema = z
       z.enum(SKILL_CATEGORY_VALUES).nullable(),
     ),
   })
+  .refine(
+    (value) => (value.semesterMin === null) === (value.semesterMax === null),
+    {
+      message: "Give both semesters, or leave both blank for any semester.",
+      path: ["semesterMax"],
+    },
+  )
+  .refine(
+    (value) =>
+      value.semesterMin === null ||
+      value.semesterMax === null ||
+      value.semesterMin <= value.semesterMax,
+    {
+      message: "The last semester cannot be before the first.",
+      path: ["semesterMax"],
+    },
+  )
   .refine(
     (v) =>
       !v.opensAt || !v.closesAt || new Date(v.closesAt) > new Date(v.opensAt),

@@ -806,7 +806,8 @@ export type Database = {
           kind: AssessmentKind;
           created_by: string | null;
           department_code: string | null;
-          semester: number | null;
+          semester_min: number | null;
+          semester_max: number | null;
           section: string | null;
           opens_at: string | null;
           closes_at: string | null;
@@ -826,7 +827,8 @@ export type Database = {
           kind?: AssessmentKind;
           created_by?: string | null;
           department_code?: string | null;
-          semester?: number | null;
+          semester_min?: number | null;
+          semester_max?: number | null;
           section?: string | null;
           opens_at?: string | null;
           closes_at?: string | null;
@@ -841,7 +843,8 @@ export type Database = {
           description: string | null;
           kind: AssessmentKind;
           department_code: string | null;
-          semester: number | null;
+          semester_min: number | null;
+          semester_max: number | null;
           section: string | null;
           opens_at: string | null;
           closes_at: string | null;

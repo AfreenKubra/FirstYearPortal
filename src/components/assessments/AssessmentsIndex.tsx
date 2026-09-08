@@ -4,11 +4,18 @@ import { ButtonLink } from "@/components/ui/Button";
 import { assessmentKindLabel } from "@/config/assessments";
 import type { AssessmentSummary } from "@/lib/queries/assessments";
 
+/** "Semester 1", "Semesters 1-2", or "all semesters". */
+function semesterPhrase(assessment: AssessmentSummary): string {
+  const { semesterMin: min, semesterMax: max } = assessment;
+  if (min === null || max === null) return "all semesters";
+  return min === max ? `Semester ${min}` : `Semesters ${min}–${max}`;
+}
+
 /** Describes an assessment's audience in the words an author would use. */
 function describeAudience(assessment: AssessmentSummary): string {
   const parts = [
     assessment.departmentCode ?? "All departments",
-    assessment.semester ? `Semester ${assessment.semester}` : "all semesters",
+    semesterPhrase(assessment),
     assessment.section ? `Section ${assessment.section}` : "all sections",
   ];
   return parts.join(" · ");

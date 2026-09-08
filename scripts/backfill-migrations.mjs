@@ -166,6 +166,19 @@ const SIGNATURES = [
          and column_name='profile_photo_url')`,
   ],
   [
+    "0042_restore_trusted_server_scoring.sql",
+    `select exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname='guard_attempt_scoring'
+         and p.prosrc like '%is_trusted_server%'
+         and p.prosrc like '%correct_count%')`,
+  ],
+  [
+    "0041_assessment_semester_range.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='assessments'
+         and column_name='semester_min')`,
+  ],
+  [
     "0040_external_result_verification.sql",
     `select exists (select 1 from information_schema.columns
        where table_schema='public' and table_name='external_test_scores'

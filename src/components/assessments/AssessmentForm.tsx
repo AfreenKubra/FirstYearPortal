@@ -100,7 +100,7 @@ export function AssessmentForm({
         hint="Papers with a skill area are counted into the student's assessment readiness figure."
       />
 
-      <fieldset className="grid gap-4 sm:grid-cols-3">
+      <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="mb-1 text-sm font-medium text-ink-muted">
           Audience
         </legend>
@@ -112,16 +112,32 @@ export function AssessmentForm({
           options={departments.map((d) => ({ value: d.code, label: d.name }))}
           error={errors.departmentCode}
         />
+        {/* A span, not a single semester. "First year" is semesters 1 and
+            2, and a paper set to one of them leaves the cohort's page the
+            term they move on — without an error, which is the worst way for
+            it to happen. Leave both blank for any semester. */}
         <Select
-          label="Semester"
-          name="semester"
+          label="Semester from"
+          name="semesterMin"
           placeholder="Any semester"
-          defaultValue={assessment?.semester?.toString() ?? ""}
+          defaultValue={assessment?.semesterMin?.toString() ?? ""}
           options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
             value: n,
             label: `Semester ${n}`,
           }))}
-          error={errors.semester}
+          error={errors.semesterMin}
+        />
+        <Select
+          label="Semester to"
+          name="semesterMax"
+          placeholder="Any semester"
+          defaultValue={assessment?.semesterMax?.toString() ?? ""}
+          options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+            value: n,
+            label: `Semester ${n}`,
+          }))}
+          error={errors.semesterMax}
+          hint="For first year, set 1 to 2."
         />
         <TextInput
           label="Section"
