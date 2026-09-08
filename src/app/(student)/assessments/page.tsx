@@ -21,6 +21,8 @@ import {
   buildInsights,
   buildReadiness,
   buildSkillAxes,
+  summariseExternal,
+  type ExternalResult,
 } from "@/lib/assessments/readiness";
 
 export const metadata: Metadata = { title: "My assessments" };
@@ -54,6 +56,23 @@ export default async function StudentAssessmentsPage() {
   const axes = buildSkillAxes(readiness.summaries);
   const insights = buildInsights(readiness);
   const resultsByCategory = new Map(byCategory.map((c) => [c.categoryId, c]));
+
+  // External results, mapped once into the shape the pure summariser takes.
+  // They are deliberately kept out of `buildReadiness`: the gauge above is
+  // about work this portal marked, and folding a self-reported number into it
+  // would make that figure mean something the heading does not say.
+  const externalResults: ExternalResult[] = externalScores.map((score) => ({
+    id: score.id,
+    categoryId: score.category,
+    platform: score.platform,
+    testName: score.testName,
+    scoreLabel: score.scoreLabel,
+    scoreValue: score.scoreValue,
+    maxScore: score.maxScore,
+    takenOn: score.takenOn,
+    verification: score.verification,
+    reviewerNote: score.reviewerNote,
+  }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -134,6 +153,7 @@ export default async function StudentAssessmentsPage() {
               key={summary.categoryId}
               summary={summary}
               results={resultsByCategory.get(summary.categoryId)}
+              external={summariseExternal(externalResults, summary.categoryId)}
             />
           ))}
         </div>

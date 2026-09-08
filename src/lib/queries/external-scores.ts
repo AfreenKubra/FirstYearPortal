@@ -1,7 +1,10 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { SkillCategoryId } from "@/config/assessments";
+import type {
+  ExternalVerification,
+  SkillCategoryId,
+} from "@/config/assessments";
 
 /**
  * Self-reported external test scores, and the one real number this portal can
@@ -21,10 +24,17 @@ export type ExternalScore = {
   certificateUrl: string | null;
   category: SkillCategoryId | null;
   createdAt: string;
+  /** Present only when the result really is a score out of something. */
+  scoreValue: number | null;
+  maxScore: number | null;
+  takenOn: string | null;
+  verification: ExternalVerification;
+  reviewerNote: string | null;
+  verifiedAt: string | null;
 };
 
 const COLUMNS =
-  "id, platform, test_name, score_label, certificate_url, category, created_at" as const;
+  "id, platform, test_name, score_label, certificate_url, category, created_at, score_value, max_score, taken_on, verification_status, reviewer_note, verified_at" as const;
 
 export async function listOwnExternalScores(): Promise<ExternalScore[]> {
   const supabase = createClient();
@@ -41,6 +51,12 @@ export async function listOwnExternalScores(): Promise<ExternalScore[]> {
     certificateUrl: row.certificate_url,
     category: row.category as SkillCategoryId | null,
     createdAt: row.created_at,
+    scoreValue: row.score_value === null ? null : Number(row.score_value),
+    maxScore: row.max_score === null ? null : Number(row.max_score),
+    takenOn: row.taken_on,
+    verification: row.verification_status,
+    reviewerNote: row.reviewer_note,
+    verifiedAt: row.verified_at,
   }));
 }
 
@@ -93,4 +109,39 @@ export async function getOwnAssessmentAverage(
     attemptCount: rows.length,
     averagePercentage: Math.round((total / rows.length) * 100) / 100,
   };
+}
+
+/**
+ * One student's external results, for the staff member who mentors them.
+ *
+ * No student id filter beyond the one asked for: RLS decides whether this
+ * caller may see this student at all, exactly as `getStudentDetail` relies on
+ * it. A staff member who is not their mentor gets an empty list rather than
+ * an error, which is the same non-answer the directory gives.
+ */
+export async function listExternalScoresForStudent(
+  studentId: string,
+): Promise<ExternalScore[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("external_test_scores")
+    .select(COLUMNS)
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    platform: row.platform,
+    testName: row.test_name,
+    scoreLabel: row.score_label,
+    certificateUrl: row.certificate_url,
+    category: row.category as SkillCategoryId | null,
+    createdAt: row.created_at,
+    scoreValue: row.score_value === null ? null : Number(row.score_value),
+    maxScore: row.max_score === null ? null : Number(row.max_score),
+    takenOn: row.taken_on,
+    verification: row.verification_status,
+    reviewerNote: row.reviewer_note,
+    verifiedAt: row.verified_at,
+  }));
 }

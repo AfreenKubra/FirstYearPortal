@@ -3,12 +3,15 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { ReadinessGauge } from "./ReadinessGauge";
 import { ProgressLineChart } from "./ProgressLineChart";
 import { StartAttemptButton } from "./StartAttemptButton";
+import { ExternalResultList } from "./ExternalResultList";
+import { AddExternalScorePanel } from "./ExternalScoreForm";
 import { AVAILABILITY_COPY } from "@/lib/assessments/grading";
 import { EXTERNAL_PRACTICE, UNSCORED_CATEGORY_ID } from "@/config/assessments";
 import {
   buildTrend,
   improvementLabel,
   type CategorySummary,
+  type ExternalCategorySummary,
 } from "@/lib/assessments/readiness";
 import type { CategoryResults } from "@/lib/queries/assessments";
 
@@ -44,9 +47,12 @@ function formatDuration(seconds: number | null): string {
 export function SkillAreaCard({
   summary,
   results,
+  external,
 }: {
   summary: CategorySummary;
   results: CategoryResults | undefined;
+  /** What the student has recorded from outside this portal for this area. */
+  external: ExternalCategorySummary;
 }) {
   const papers = results?.papers ?? [];
   const attempts = results?.attempts ?? [];
@@ -227,20 +233,58 @@ export function SkillAreaCard({
           </div>
         )}
 
-        {practice && (
-          <p className="text-xs text-ink-faint">
-            Optional outside practice:{" "}
-            <a
-              href={practice.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-indigo-700 hover:underline"
-            >
-              {practice.label} ↗
-            </a>{" "}
-            — {practice.provider}. Nothing you score there reaches this portal
-            on its own.
-          </p>
+        {/* Outside practice, and what came back from it.
+            None of these platforms report results here, so the loop is
+            closed by the student: take the test, then record what you
+            scored, and it appears on this card straight away. Saying that
+            plainly is the alternative to a sync that does not exist. */}
+        {(practice || external.results.length > 0) && (
+          <div className="space-y-2 border-t border-indigo-100 pt-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-brass-700">
+                Outside this portal
+              </h4>
+              {external.bestVerifiedPercentage !== null && (
+                <span className="text-xs text-ink-muted">
+                  Best verified:{" "}
+                  <span className="font-medium tabular-nums text-indigo-900">
+                    {external.bestVerifiedPercentage}%
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {practice && (
+              <p className="text-xs text-ink-faint">
+                <a
+                  href={practice.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-indigo-700 hover:underline"
+                >
+                  {practice.label} ↗
+                </a>{" "}
+                — {practice.provider}. Your score there does not reach this
+                portal on its own; record it below and it shows up here.
+              </p>
+            )}
+
+            <ExternalResultList summary={external} />
+
+            {external.awaitingReview > 0 && (
+              <p className="text-xs text-ink-faint">
+                {external.awaitingReview} result
+                {external.awaitingReview === 1 ? "" : "s"} waiting for a member
+                of staff to check.
+              </p>
+            )}
+
+            <AddExternalScorePanel
+              presetCategory={summary.categoryId}
+              presetPlatform={practice?.provider}
+              label="Record a result from this area"
+            />
+          </div>
         )}
       </CardBody>
     </Card>

@@ -6,6 +6,8 @@ import { getStudentDetail } from "@/lib/queries/directory";
 import { getAchievementsForStudent } from "@/lib/queries/achievements";
 import { getRoadmapsForStudent } from "@/lib/queries/roadmaps";
 import { RoadmapPanel } from "@/components/roadmap/RoadmapPanel";
+import { ExternalResultReview } from "@/components/assessments/ExternalResultReview";
+import { listExternalScoresForStudent } from "@/lib/queries/external-scores";
 
 export const metadata: Metadata = { title: "Student profile" };
 
@@ -17,10 +19,11 @@ export default async function StudentDetailPage({
   const staff = await getOwnStaff();
   if (!staff) redirect("/login");
 
-  const [detail, achievements, roadmaps] = await Promise.all([
+  const [detail, achievements, roadmaps, externalScores] = await Promise.all([
     getStudentDetail(params.id),
     getAchievementsForStudent(params.id),
     getRoadmapsForStudent(params.id),
+    listExternalScoresForStudent(params.id),
   ]);
 
   // RLS makes an unauthorised student's row simply not exist for this caller,
@@ -40,6 +43,7 @@ export default async function StudentDetailPage({
       roadmapPanel={
         <RoadmapPanel studentId={params.id} roadmaps={roadmaps} />
       }
+      externalResultsPanel={<ExternalResultReview scores={externalScores} />}
     />
   );
 }

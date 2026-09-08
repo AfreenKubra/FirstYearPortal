@@ -28,6 +28,7 @@ import type {
   QuestionKind,
   AttemptStatus,
   SkillCategoryId,
+  ExternalVerification,
 } from "@/config/assessments";
 
 /** `public.integrity_status` (0039). NULL means not assessed. */
@@ -455,6 +456,13 @@ export type Database = {
           certificate_url: string | null;
           category: string | null;
           created_at: string;
+          score_value: number | null;
+          max_score: number | null;
+          taken_on: string | null;
+          verification_status: ExternalVerification;
+          verified_by: string | null;
+          verified_at: string | null;
+          reviewer_note: string | null;
         };
         Insert: {
           student_id: string;
@@ -463,8 +471,19 @@ export type Database = {
           score_label: string;
           certificate_url?: string | null;
           category?: string | null;
+          score_value?: number | null;
+          max_score?: number | null;
+          taken_on?: string | null;
         };
-        Update: never;
+        // Only the verdict. A student's own claim is not editable after the
+        // fact — they delete it and record it again — and 0040's trigger
+        // refuses these fields from anyone who is not a reviewer.
+        Update: Partial<{
+          verification_status: ExternalVerification;
+          verified_by: string | null;
+          verified_at: string | null;
+          reviewer_note: string | null;
+        }>;
         Relationships: [];
       };
       college_calendar_events: {

@@ -277,3 +277,42 @@ export const EXTERNAL_PRACTICE: ReadonlyArray<{
     provider: "16Personalities",
   },
 ];
+
+/**
+ * What has happened to a self-reported external result.
+ *
+ * The three states are deliberately not collapsible into a boolean. "Nobody
+ * has looked at this yet" and "someone looked and rejected it" are different
+ * things to show a student, and merging them into "not verified" would let a
+ * rejected result sit indefinitely looking merely unreviewed.
+ */
+export const EXTERNAL_VERIFICATION = [
+  {
+    id: "self_reported",
+    label: "Student submitted — unverified",
+    short: "Unverified",
+    hint: "You recorded this yourself. No one here has checked it yet.",
+  },
+  {
+    id: "verified",
+    label: "Faculty verified",
+    short: "Verified",
+    hint: "A member of staff has checked this against your certificate.",
+  },
+  {
+    id: "rejected",
+    label: "Not accepted",
+    short: "Not accepted",
+    hint: "A member of staff reviewed this and did not accept it.",
+  },
+] as const;
+
+export type ExternalVerification = (typeof EXTERNAL_VERIFICATION)[number]["id"];
+
+export const EXTERNAL_VERIFICATION_VALUES = EXTERNAL_VERIFICATION.map(
+  (v) => v.id,
+) as [ExternalVerification, ...ExternalVerification[]];
+
+export function externalVerificationLabel(value: string | null | undefined) {
+  return EXTERNAL_VERIFICATION.find((v) => v.id === value) ?? null;
+}

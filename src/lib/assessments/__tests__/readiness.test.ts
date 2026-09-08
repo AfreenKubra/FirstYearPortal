@@ -6,8 +6,11 @@ import {
   buildSkillAxes,
   buildTrend,
   improvementLabel,
+  externalPercentage,
   performanceLevel,
   summariseCategory,
+  summariseExternal,
+  type ExternalResult,
   type ScoredAttempt,
 } from "../readiness";
 
@@ -267,5 +270,132 @@ describe("buildInsights", () => {
       (i) => i.heading === "Recommended next step",
     );
     expect(step?.detail).toBe("Retake the Communication Skills assessment.");
+  });
+});
+
+describe("externalPercentage", () => {
+  const result = (over: Partial<ExternalResult> = {}): ExternalResult => ({
+    id: "e1",
+    categoryId: "aptitude",
+    platform: "TrainThinking",
+    testName: "CCAT practice",
+    scoreLabel: "39/50",
+    scoreValue: 39,
+    maxScore: 50,
+    takenOn: "2026-09-01",
+    verification: "self_reported",
+    reviewerNote: null,
+    ...over,
+  });
+
+  it("converts a score out of a maximum", () => {
+    expect(externalPercentage(result())).toBe(78);
+  });
+
+  it("returns null for a result that is not a score out of anything", () => {
+    // "Elite", "Band 7", "Pass" are real results with no position on a
+    // 0-100 scale. Inventing one would be worse than showing the words.
+    expect(
+      externalPercentage(result({ scoreValue: null, maxScore: null, scoreLabel: "Elite" })),
+    ).toBeNull();
+  });
+
+  it("returns null for a rejected result", () => {
+    // Somebody looked at it and declined it. Plotting it anyway would let a
+    // rejected claim keep counting.
+    expect(externalPercentage(result({ verification: "rejected" }))).toBeNull();
+  });
+
+  it("returns null rather than dividing by zero", () => {
+    expect(externalPercentage(result({ scoreValue: 0, maxScore: 0 }))).toBeNull();
+  });
+
+  it("handles a zero score without confusing it for missing data", () => {
+    expect(externalPercentage(result({ scoreValue: 0, maxScore: 50 }))).toBe(0);
+  });
+});
+
+describe("summariseExternal", () => {
+  const make = (
+    id: string,
+    over: Partial<ExternalResult> = {},
+  ): ExternalResult => ({
+    id,
+    categoryId: "aptitude",
+    platform: "TrainThinking",
+    testName: "Practice",
+    scoreLabel: "",
+    scoreValue: 40,
+    maxScore: 50,
+    takenOn: "2026-09-01",
+    verification: "self_reported",
+    reviewerNote: null,
+    ...over,
+  });
+
+  it("returns empty rather than throwing when nothing is recorded", () => {
+    const summary = summariseExternal([], "aptitude");
+    expect(summary.results).toEqual([]);
+    expect(summary.bestVerifiedPercentage).toBeNull();
+    expect(summary.bestUnverifiedPercentage).toBeNull();
+    expect(summary.awaitingReview).toBe(0);
+  });
+
+  it("only picks up results for the area asked for", () => {
+    const summary = summariseExternal(
+      [make("a"), make("b", { categoryId: "communication" }), make("c", { categoryId: null })],
+      "aptitude",
+    );
+    expect(summary.results.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("keeps verified and unverified bests apart", () => {
+    // The whole point of the split: a number a member of staff checked and a
+    // number typed in last night must never be reported as the same fact.
+    const summary = summariseExternal(
+      [
+        make("a", { verification: "verified", scoreValue: 30 }),
+        make("b", { verification: "self_reported", scoreValue: 50 }),
+      ],
+      "aptitude",
+    );
+    expect(summary.bestVerifiedPercentage).toBe(60);
+    expect(summary.bestUnverifiedPercentage).toBe(100);
+  });
+
+  it("excludes rejected results from both bests", () => {
+    const summary = summariseExternal(
+      [make("a", { verification: "rejected", scoreValue: 50 })],
+      "aptitude",
+    );
+    expect(summary.bestVerifiedPercentage).toBeNull();
+    expect(summary.bestUnverifiedPercentage).toBeNull();
+    // It is still listed, so the student can see it was declined.
+    expect(summary.results).toHaveLength(1);
+  });
+
+  it("counts only unreviewed results as awaiting review", () => {
+    const summary = summariseExternal(
+      [
+        make("a"),
+        make("b"),
+        make("c", { verification: "verified" }),
+        make("d", { verification: "rejected" }),
+      ],
+      "aptitude",
+    );
+    expect(summary.awaitingReview).toBe(2);
+  });
+
+  it("orders by date taken, most recent first", () => {
+    const summary = summariseExternal(
+      [
+        make("old", { takenOn: "2026-01-05" }),
+        make("new", { takenOn: "2026-09-05" }),
+        make("mid", { takenOn: "2026-05-05" }),
+      ],
+      "aptitude",
+    );
+    expect(summary.results.map((r) => r.id)).toEqual(["new", "mid", "old"]);
   });
 });

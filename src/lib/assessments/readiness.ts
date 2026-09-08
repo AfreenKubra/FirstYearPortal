@@ -292,3 +292,77 @@ export function improvementLabel(trend: readonly TrendPoint[]): string | null {
   const direction = delta > 0 ? "Improved by" : "Down by";
   return `${direction} ${Math.abs(delta)} percentage points since your first attempt`;
 }
+
+/** A result a student recorded from a platform outside this portal. */
+export type ExternalResult = {
+  id: string;
+  categoryId: SkillCategoryId | null;
+  platform: string;
+  testName: string;
+  /** Exactly what the student typed: "82%", "Elite", "Band 7". */
+  scoreLabel: string;
+  scoreValue: number | null;
+  maxScore: number | null;
+  takenOn: string | null;
+  verification: "self_reported" | "verified" | "rejected";
+  /** A reviewer's reason, shown to the student alongside the verdict. */
+  reviewerNote: string | null;
+};
+
+/**
+ * An external result as a percentage, or null when it is not one.
+ *
+ * "Elite", "Pass" and "Band 7" are real results that are not positions on a
+ * 0-100 scale, and this returns null for them rather than inventing a number.
+ * A rejected result also returns null: a member of staff has looked at it and
+ * declined it, so it is not evidence of anything and must not be plotted.
+ */
+export function externalPercentage(result: ExternalResult): number | null {
+  if (result.verification === "rejected") return null;
+  if (result.scoreValue === null || result.maxScore === null) return null;
+  if (result.maxScore <= 0) return null;
+  return Math.round((result.scoreValue / result.maxScore) * 10000) / 100;
+}
+
+export type ExternalCategorySummary = {
+  /** Everything the student recorded against this area, newest first. */
+  results: ExternalResult[];
+  /** Best percentage among results a member of staff has verified. */
+  bestVerifiedPercentage: number | null;
+  /** Best percentage among results nobody has checked yet. */
+  bestUnverifiedPercentage: number | null;
+  awaitingReview: number;
+};
+
+/**
+ * External results for one skill area, split by whether anyone has checked
+ * them.
+ *
+ * The split is the whole point. A verified result and a number a student
+ * typed in last night are shown differently and counted differently, and
+ * keeping them apart here means no UI can accidentally present one as the
+ * other.
+ */
+export function summariseExternal(
+  results: readonly ExternalResult[],
+  categoryId: SkillCategoryId,
+): ExternalCategorySummary {
+  const mine = results
+    .filter((r) => r.categoryId === categoryId)
+    .sort((a, b) => (b.takenOn ?? "").localeCompare(a.takenOn ?? ""));
+
+  const best = (verification: ExternalResult["verification"]) => {
+    const percentages = mine
+      .filter((r) => r.verification === verification)
+      .map(externalPercentage)
+      .filter((p): p is number => p !== null);
+    return percentages.length > 0 ? Math.max(...percentages) : null;
+  };
+
+  return {
+    results: mine,
+    bestVerifiedPercentage: best("verified"),
+    bestUnverifiedPercentage: best("self_reported"),
+    awaitingReview: mine.filter((r) => r.verification === "self_reported").length,
+  };
+}

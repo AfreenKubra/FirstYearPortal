@@ -58,6 +58,7 @@ export function StudentProfile({
   canVerify,
   mentorBadge,
   roadmapPanel,
+  externalResultsPanel,
 }: {
   detail: StudentDetail;
   achievements: Achievement[];
@@ -72,6 +73,8 @@ export function StudentProfile({
    * so a reader with no mentoring relationship to act on can leave it out.
    */
   roadmapPanel?: ReactNode;
+  /** Self-reported outside results awaiting a verify/reject decision. */
+  externalResultsPanel?: ReactNode;
 }) {
   const { row, departmentName } = detail;
 
@@ -207,6 +210,7 @@ export function StudentProfile({
           </Card>
 
           {roadmapPanel}
+          {externalResultsPanel}
         </div>
 
         <div className="space-y-6">

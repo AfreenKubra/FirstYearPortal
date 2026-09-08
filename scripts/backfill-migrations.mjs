@@ -166,6 +166,12 @@ const SIGNATURES = [
          and column_name='profile_photo_url')`,
   ],
   [
+    "0040_external_result_verification.sql",
+    `select exists (select 1 from information_schema.columns
+       where table_schema='public' and table_name='external_test_scores'
+         and column_name='verification_status')`,
+  ],
+  [
     "0039_assessment_analytics.sql",
     `select exists (select 1 from information_schema.columns
        where table_schema='public' and table_name='assessments'
