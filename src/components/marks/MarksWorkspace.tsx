@@ -1,6 +1,7 @@
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { MarksGrid } from "./MarksGrid";
 import { SubjectTeacherForm } from "./SubjectTeacherForm";
+import { SheetImportPanel } from "./SheetImportPanel";
 import {
   getMarksGrid,
   listAssignableFaculty,
@@ -113,11 +114,19 @@ export async function MarksWorkspace({
       </Card>
 
       {grid ? (
-        <MarksGrid
-          subjectId={selected.id}
-          subjectLabel={`${selected.code} — ${selected.name}`}
-          grid={grid}
-        />
+        <>
+          <MarksGrid
+            subjectId={selected.id}
+            subjectLabel={`${selected.code} — ${selected.name}`}
+            grid={grid}
+          />
+          <SheetImportPanel
+            key={`${selected.id}:${section ?? ""}`}
+            subjectId={selected.id}
+            subjectLabel={selected.code}
+            section={section}
+          />
+        </>
       ) : (
         <Card>
           <CardBody>

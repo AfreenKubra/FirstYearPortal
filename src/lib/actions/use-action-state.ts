@@ -20,10 +20,18 @@ import { idleState, type ActionState } from "./form-state";
  * Guarding here means the type is true again: what comes out is an
  * `ActionState`, always, and a redirecting action simply leaves it idle.
  */
-export function useActionState(
-  action: (prev: ActionState, formData: FormData) => Promise<ActionState>,
-  initial: ActionState = idleState,
-): [ActionState, (formData: FormData) => void] {
-  const [state, formAction] = useFormState(action, initial);
-  return [state ?? initial, formAction];
+export function useActionState<S = ActionState>(
+  action: (prev: S, formData: FormData) => Promise<S>,
+  initial: S = idleState as S,
+): [S, (formData: FormData) => void] {
+  // Generic so an action with a richer result — the marks-sheet preview
+  // carries the whole diff — gets the same undefined guard as every form.
+  // React types the state as `Awaited<S>`, which a generic `S` cannot be
+  // proven equal to. Every state here is a plain object, never a promise,
+  // so the two are the same type in practice.
+  const [state, formAction] = useFormState(
+    action as unknown as (prev: Awaited<S>, formData: FormData) => Promise<Awaited<S>>,
+    initial as Awaited<S>,
+  );
+  return [(state ?? initial) as S, formAction];
 }

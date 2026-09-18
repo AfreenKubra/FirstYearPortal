@@ -167,6 +167,19 @@ const SIGNATURES = [
          and column_name='profile_photo_url')`,
   ],
   [
+    "0043_calendar_cie_see.sql",
+    `select exists (select 1 from pg_enum e join pg_type t on t.oid=e.enumtypid
+       where t.typname='calendar_event_category' and e.enumlabel='see')`,
+  ],
+  [
+    // A data move with no object of its own: applied means no IA-test or
+    // semester-exam rows remain in the generic `exam` category.
+    "0044_calendar_recategorise_exams.sql",
+    `select not exists (select 1 from public.college_calendar_events
+       where category = 'exam'
+         and (title ~* '\\mIA\\M' or title ~* 'semester\\s+(theory|practical)\\s+exam'))`,
+  ],
+  [
     "0042_restore_trusted_server_scoring.sql",
     `select exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname='guard_attempt_scoring'

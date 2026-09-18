@@ -247,6 +247,34 @@ const CHECKS = [
     probe: () => columnExists("assessments", "semester_min"),
   },
   {
+    migration: "0043_calendar_cie_see.sql",
+    label: "CIE and SEE calendar categories",
+    probe: async () => {
+      // An enum value has no table to select from; inserting nothing that
+      // names it is the cheapest honest check that PostgREST accepts it.
+      const { error } = await db
+        .from("college_calendar_events")
+        .select("id")
+        .eq("category", "see")
+        .limit(1);
+      return !error;
+    },
+  },
+  {
+    migration: "0044_calendar_recategorise_exams.sql",
+    label: "IA tests and semester exams moved to CIE / SEE",
+    probe: async () => {
+      const { data, error } = await db
+        .from("college_calendar_events")
+        .select("title")
+        .eq("category", "exam");
+      if (error) return false;
+      return !(data ?? []).some(
+        (r) => /\bIA\b/i.test(r.title) || /semester\s+(theory|practical)\s+exam/i.test(r.title),
+      );
+    },
+  },
+  {
     // A probe on behaviour rather than on an object, because 0042 creates
     // nothing — it restores an exemption 0039 had reverted. Anything that
     // merely looked for a table would report this as applied on a database
