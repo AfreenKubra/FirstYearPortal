@@ -4,7 +4,44 @@ import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/Card";
 import { CALENDAR_FILTERS, categoryMeta } from "@/config/calendar";
 import type { CalendarEventCategory } from "@/config/calendar";
-import { byCategory, daysUntil, upcoming, type CalendarEvent } from "@/lib/calendar/schedule";
+import {
+  byCategory,
+  daysUntil,
+  saturdayNote,
+  upcoming,
+  type CalendarEvent,
+} from "@/lib/calendar/schedule";
+
+/**
+ * What an empty list says depends on what was asked for. "Nothing coming up"
+ * is true but useless when a student taps SEE: the dates do not exist yet
+ * because VTU has not released them, and saying so is the actual answer.
+ */
+function emptyCopy(filter: readonly CalendarEventCategory[] | null): {
+  title: string;
+  description: string;
+} {
+  const only = filter?.length === 1 ? filter[0] : null;
+
+  if (only === "see") {
+    return {
+      title: "SEE dates not announced yet",
+      description:
+        "Semester End Examination dates are set by VTU. They will be published here once VTU releases the timetable.",
+    };
+  }
+  if (only === "cie") {
+    return {
+      title: "No internal assessments scheduled yet",
+      description:
+        "Your IA (CIE) test dates appear here as soon as the college adds them to the academic calendar.",
+    };
+  }
+  return {
+    title: "Nothing coming up",
+    description: "Events, exams, and deadlines will appear here as they're added.",
+  };
+}
 
 function dateLabel(event: CalendarEvent): string {
   const start = new Date(`${event.startsOn}T00:00:00`).toLocaleDateString(undefined, {
@@ -80,10 +117,7 @@ export function UpcomingEventsWidget({
         </div>
 
         {next.length === 0 ? (
-          <EmptyState
-            title="Nothing coming up"
-            description="Events, exams, and deadlines will appear here as they're added."
-          />
+          <EmptyState {...emptyCopy(filter)} />
         ) : (
           <ul className="space-y-2.5">
             {next.map((event) => {
@@ -96,7 +130,15 @@ export function UpcomingEventsWidget({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ink">{event.title}</p>
                     <p className="text-xs text-ink-faint">
-                      {dateLabel(event)} · {remainingLabel(event, todayIso)}
+                      {dateLabel(event)}
+                      {saturdayNote(event) && (
+                        <>
+                          {" · "}
+                          <span className="font-medium text-ink-muted">{saturdayNote(event)}</span>
+                        </>
+                      )}
+                      {" · "}
+                      {remainingLabel(event, todayIso)}
                     </p>
                   </div>
                 </li>

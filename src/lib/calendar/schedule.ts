@@ -44,6 +44,34 @@ export function isPast(event: CalendarEvent, todayIso: string): boolean {
   return toUtcDays(lastDay) < toUtcDays(todayIso);
 }
 
+const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"];
+
+/**
+ * "4th Saturday", or null when the date is not a Saturday.
+ *
+ * VTU colleges run some Saturdays on a weekday's timetable and keep others
+ * as holidays, and which is which is fixed by its place in the month — the
+ * 2nd and 4th are often working days, the 1st and 3rd off. A row titled
+ * "Tuesday Timetable" does not say which Saturday it is; this does, from the
+ * date alone. Computed in UTC like everything else here, so the answer does
+ * not shift with the reader's timezone.
+ */
+export function saturdayOfMonth(dateIso: string): string | null {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCDay() !== 6) return null;
+  return `${ORDINALS[Math.ceil(d / 7) - 1]} Saturday`;
+}
+
+/**
+ * The Saturday label, unless the title already says it — a holiday row is
+ * often titled "3rd Saturday" outright, and repeating it reads as a glitch.
+ */
+export function saturdayNote(event: CalendarEvent): string | null {
+  if (/saturday/i.test(event.title)) return null;
+  return saturdayOfMonth(event.startsOn);
+}
+
 export function isOngoing(event: CalendarEvent, todayIso: string): boolean {
   const today = toUtcDays(todayIso);
   const start = toUtcDays(event.startsOn);

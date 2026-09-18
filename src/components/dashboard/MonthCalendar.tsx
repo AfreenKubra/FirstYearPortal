@@ -14,6 +14,7 @@ import {
   groupByDate,
   isOngoing,
   isPast,
+  saturdayNote,
   upcoming,
   type CalendarEvent,
 } from "@/lib/calendar/schedule";
@@ -104,7 +105,10 @@ function EventRow({
       >
         <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
         <span className="min-w-0 flex-1 truncate text-ink">{event.title}</span>
-        <span className="shrink-0 text-xs text-ink-faint">{formatRange(event)}</span>
+        <span className="shrink-0 text-xs text-ink-faint">
+          {formatRange(event)}
+          {saturdayNote(event) && ` · ${saturdayNote(event)}`}
+        </span>
       </button>
     </li>
   );

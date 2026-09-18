@@ -6,6 +6,8 @@ import {
   groupByDate,
   isOngoing,
   isPast,
+  saturdayNote,
+  saturdayOfMonth,
   upcoming,
   type CalendarEvent,
 } from "../schedule";
@@ -160,6 +162,34 @@ describe("examWindows", () => {
       "finals",
       "gate",
     ]);
+  });
+});
+
+describe("saturdayOfMonth", () => {
+  it("names which Saturday of the month a date is", () => {
+    // The timetable swaps on the real 2026 calendar.
+    expect(saturdayOfMonth("2026-09-12")).toBe("2nd Saturday"); // Monday Timetable
+    expect(saturdayOfMonth("2026-09-26")).toBe("4th Saturday"); // Tuesday Timetable
+    expect(saturdayOfMonth("2026-10-24")).toBe("4th Saturday"); // Wednesday Timetable
+    expect(saturdayOfMonth("2026-11-14")).toBe("2nd Saturday"); // Thursday Timetable
+  });
+
+  it("covers a fifth Saturday", () => {
+    expect(saturdayOfMonth("2026-10-31")).toBe("5th Saturday");
+  });
+
+  it("returns null for any other day", () => {
+    expect(saturdayOfMonth("2026-09-08")).toBeNull(); // Tuesday
+    expect(saturdayOfMonth("2026-09-13")).toBeNull(); // Sunday
+  });
+
+  it("does not repeat it when the title already says it", () => {
+    expect(
+      saturdayNote(event({ title: "3rd Saturday", category: "holiday", startsOn: "2026-09-19" })),
+    ).toBeNull();
+    expect(
+      saturdayNote(event({ title: "Tuesday Timetable", category: "timetable", startsOn: "2026-09-26" })),
+    ).toBe("4th Saturday");
   });
 });
 
