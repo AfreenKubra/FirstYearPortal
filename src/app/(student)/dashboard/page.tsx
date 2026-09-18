@@ -35,7 +35,8 @@ import type { CalendarEvent } from "@/lib/calendar/schedule";
 import { MonthCalendar } from "@/components/dashboard/MonthCalendar";
 import { UpcomingEventsWidget } from "@/components/dashboard/UpcomingEventsWidget";
 import { UpcomingExaminationsWidget } from "@/components/dashboard/UpcomingExaminationsWidget";
-import { ProfilePhotoUpload } from "@/components/profile/ProfilePhotoUpload";
+import Link from "next/link";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { StudentMarksTable } from "@/components/marks/StudentMarksTable";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -170,10 +171,21 @@ export default async function DashboardPage() {
             {academic?.section ?? "—"}
           </p>
         </div>
-        <ProfilePhotoUpload
-          studentName={student.fullName}
-          photoUrl={profilePhotoUrl}
-        />
+        {/* Display only. Changing the photo lives on My profile with the
+            rest of the student's own details, so the dashboard stays a place
+            to read rather than edit. */}
+        <Link
+          href="/complete-profile"
+          aria-label="Your profile picture — change it on My profile"
+          title="Change on My profile"
+          className="self-start rounded-full transition-shadow hover:ring-2 hover:ring-indigo-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:self-center"
+        >
+          <ProfileAvatar
+            studentName={student.fullName}
+            photoUrl={profilePhotoUrl}
+            size="lg"
+          />
+        </Link>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

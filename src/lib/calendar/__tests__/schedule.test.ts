@@ -9,6 +9,12 @@ import {
   upcoming,
   type CalendarEvent,
 } from "../schedule";
+import {
+  CALENDAR_CATEGORIES,
+  CALENDAR_FILTERS,
+  categoryMeta,
+  isExamCategory,
+} from "@/config/calendar";
 
 /**
  * Calendar date math is where an off-by-one silently mislabels an exam as
@@ -138,6 +144,52 @@ describe("examWindows", () => {
   it("drops a window once it has fully passed", () => {
     const past = event({ category: "exam", startsOn: "2026-08-01", endsOn: "2026-08-05" });
     expect(examWindows([past], "2026-09-03")).toEqual([]);
+  });
+
+  it("includes CIE and SEE windows, not just the generic exam category", () => {
+    // IA tests moved to `cie` and semester-end exams to `see` (0044). A check
+    // on `category === "exam"` alone would have dropped every one of them
+    // from "Upcoming examinations" without an error.
+    const events = [
+      event({ id: "ia", category: "cie", startsOn: "2026-10-28", endsOn: "2026-10-30" }),
+      event({ id: "finals", category: "see", startsOn: "2027-01-04", endsOn: "2027-02-05" }),
+      event({ id: "gate", category: "exam", startsOn: "2027-02-06", endsOn: "2027-02-14" }),
+    ];
+    expect(examWindows(events, "2026-09-03").map((e) => e.id)).toEqual([
+      "ia",
+      "finals",
+      "gate",
+    ]);
+  });
+});
+
+describe("calendar categories", () => {
+  it("counts CIE, SEE and other exams as examinations, and nothing else", () => {
+    expect(isExamCategory("cie")).toBe(true);
+    expect(isExamCategory("see")).toBe(true);
+    expect(isExamCategory("exam")).toBe(true);
+    for (const other of ["holiday", "ptm", "academic", "deadline", "timetable"] as const) {
+      expect(isExamCategory(other), other).toBe(false);
+    }
+  });
+
+  it("offers CIE and SEE as filter chips of their own", () => {
+    const labels = CALENDAR_FILTERS.map((f) => f.label);
+    expect(labels).toContain("CIE");
+    expect(labels).toContain("SEE");
+  });
+
+  it("gives every category a chip, so none is unreachable by filtering", () => {
+    const covered = new Set(CALENDAR_FILTERS.flatMap((f) => f.categories ?? []));
+    for (const category of CALENDAR_CATEGORIES) {
+      expect(covered.has(category.value), category.value).toBe(true);
+    }
+  });
+
+  it("falls back to Academic, found by value rather than array position", () => {
+    // It used to be `CALENDAR_CATEGORIES[3]`, which inserting CIE and SEE
+    // would have quietly turned into "Other Examination".
+    expect(categoryMeta("nonsense" as never).value).toBe("academic");
   });
 });
 

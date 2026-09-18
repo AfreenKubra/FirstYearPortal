@@ -5,16 +5,7 @@ import { uploadProfilePhoto } from "@/lib/actions/profile-photo";
 import { idleState } from "@/lib/actions/form-state";
 import { useActionState } from "@/lib/actions/use-action-state";
 import { FormMessage, SubmitButton } from "@/components/ui/FormStatus";
-
-function initials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
+import { ProfileAvatar } from "./ProfileAvatar";
 
 export function ProfilePhotoUpload({
   studentName,
@@ -43,29 +34,16 @@ export function ProfilePhotoUpload({
   const shownPhoto = previewUrl ?? photoUrl;
 
   return (
-    <div className="w-full rounded-xl border border-indigo-100 bg-white p-3 shadow-sm sm:w-auto sm:min-w-[19rem]">
+    <div className="w-full">
       <div className="flex items-center gap-3">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-indigo-100 text-lg font-semibold text-indigo-800 shadow ring-1 ring-indigo-200">
-          {shownPhoto ? (
-            // Signed storage URLs are dynamic, so the native image element is
-            // intentional here rather than a build-time configured host.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={shownPhoto}
-              alt={`${studentName}'s profile`}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span aria-hidden="true">{initials(studentName) || "S"}</span>
-          )}
-        </div>
+        <ProfileAvatar studentName={studentName} photoUrl={shownPhoto} />
 
         <form action={formAction} className="min-w-0 flex-1 space-y-2">
           <label
             htmlFor="profile-photo"
             className="block text-sm font-medium text-indigo-950"
           >
-            Profile picture
+            Choose a new photo
           </label>
           <input
             id="profile-photo"

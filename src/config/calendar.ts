@@ -16,11 +16,30 @@ export const CALENDAR_CATEGORIES = [
     badge: "border-red-200 bg-red-50 text-red-700",
   },
   {
-    value: "exam",
-    label: "IA / Examination",
+    // Continuous Internal Evaluation — the IA tests the college runs through
+    // the semester. Keeps the amber IA tests always had.
+    value: "cie",
+    label: "CIE (Internal Assessment)",
     emoji: "🟡",
     dot: "bg-amber-500",
     badge: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  {
+    // Semester End Examination — VTU's own theory and practical exams.
+    value: "see",
+    label: "SEE (Semester End Exam)",
+    emoji: "🟠",
+    dot: "bg-orange-600",
+    badge: "border-orange-200 bg-orange-50 text-orange-800",
+  },
+  {
+    // Neither CIE nor SEE: in practice, the dated competitive exams the
+    // dashboard pulls in for a student's chosen goals.
+    value: "exam",
+    label: "Other Examination",
+    emoji: "🟤",
+    dot: "bg-stone-500",
+    badge: "border-stone-200 bg-stone-50 text-stone-700",
   },
   {
     value: "ptm",
@@ -60,8 +79,28 @@ export const CALENDAR_CATEGORY_VALUES = CALENDAR_CATEGORIES.map(
 
 const CATEGORY_BY_VALUE = new Map(CALENDAR_CATEGORIES.map((c) => [c.value, c]));
 
+/** Falls back to "Academic / Semester Event" — looked up by value, not index. */
 export function categoryMeta(value: CalendarEventCategory) {
-  return CATEGORY_BY_VALUE.get(value) ?? CALENDAR_CATEGORIES[3];
+  return CATEGORY_BY_VALUE.get(value) ?? CATEGORY_BY_VALUE.get("academic")!;
+}
+
+/**
+ * Every category that is an examination of some kind.
+ *
+ * The "Upcoming examinations" widget and the calendar's ongoing-exam
+ * highlight both used to test `category === "exam"`. Once IA tests moved to
+ * `cie` and semester-end exams to `see`, that check would have silently
+ * dropped every one of them from both places. One set, read by both, so a
+ * category added here is picked up everywhere at once.
+ */
+export const EXAM_CATEGORIES: ReadonlySet<CalendarEventCategory> = new Set([
+  "cie",
+  "see",
+  "exam",
+]);
+
+export function isExamCategory(value: CalendarEventCategory): boolean {
+  return EXAM_CATEGORIES.has(value);
 }
 
 /**
@@ -72,7 +111,9 @@ export function categoryMeta(value: CalendarEventCategory) {
  */
 export const CALENDAR_FILTERS = [
   { label: "All Events", categories: null },
-  { label: "Exams", categories: ["exam"] },
+  { label: "CIE", categories: ["cie"] },
+  { label: "SEE", categories: ["see"] },
+  { label: "Other Exams", categories: ["exam"] },
   { label: "Holidays", categories: ["holiday"] },
   { label: "Meetings", categories: ["ptm"] },
   { label: "Deadlines", categories: ["deadline"] },

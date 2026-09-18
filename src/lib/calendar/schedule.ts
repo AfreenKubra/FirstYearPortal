@@ -8,7 +8,7 @@
  * day. Free of `server-only`, so this can be tested without a database.
  */
 
-import type { CalendarEventCategory } from "@/config/calendar";
+import { isExamCategory, type CalendarEventCategory } from "@/config/calendar";
 
 export type CalendarEvent = {
   id: string;
@@ -89,7 +89,7 @@ export function examWindows(
   todayIso: string,
 ): CalendarEvent[] {
   return upcoming(
-    events.filter((e) => e.category === "exam" && e.endsOn !== null),
+    events.filter((e) => isExamCategory(e.category) && e.endsOn !== null),
     todayIso,
   );
 }

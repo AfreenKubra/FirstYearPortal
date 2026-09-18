@@ -5,7 +5,8 @@ import {
   PersonalSectionForm,
   SelectionSectionForm,
 } from "@/components/profile/ProfileSectionForm";
-import { Card, CardBody, ProgressBar } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader, ProgressBar } from "@/components/ui/Card";
+import { ProfilePhotoUpload } from "@/components/profile/ProfilePhotoUpload";
 import { ButtonLink } from "@/components/ui/Button";
 import {
   saveAcademicSection,
@@ -17,6 +18,7 @@ import {
 import {
   getLookups,
   getOwnStudent,
+  getProfilePhotoUrl,
   getProfileSnapshot,
 } from "@/lib/queries/student";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +34,7 @@ export default async function CompleteProfilePage() {
   if (!student) redirect("/login");
 
   const supabase = createClient();
-  const [snapshot, lookups, academicRow] = await Promise.all([
+  const [snapshot, lookups, academicRow, photoUrl] = await Promise.all([
     getProfileSnapshot(student),
     getLookups(),
     supabase
@@ -40,6 +42,7 @@ export default async function CompleteProfilePage() {
       .select("*")
       .eq("student_id", student.id)
       .maybeSingle(),
+    getProfilePhotoUrl(student.profilePhotoPath),
   ]);
 
   const sections = evaluateSections(snapshot);
@@ -75,6 +78,18 @@ export default async function CompleteProfilePage() {
               <ButtonLink href="/dashboard">Go to your dashboard</ButtonLink>
             </div>
           )}
+        </CardBody>
+      </Card>
+
+      {/* The one place a student changes their photo. The dashboard shows it
+          and links here, rather than carrying an upload form of its own. */}
+      <Card as="section">
+        <CardHeader
+          title="Profile picture"
+          description="Shown on your dashboard and to the faculty who mentor you."
+        />
+        <CardBody>
+          <ProfilePhotoUpload studentName={student.fullName} photoUrl={photoUrl} />
         </CardBody>
       </Card>
 

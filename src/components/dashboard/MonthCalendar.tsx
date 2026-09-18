@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { CALENDAR_CATEGORIES, CALENDAR_FILTERS, categoryMeta } from "@/config/calendar";
+import {
+  CALENDAR_CATEGORIES,
+  CALENDAR_FILTERS,
+  categoryMeta,
+  isExamCategory,
+} from "@/config/calendar";
 import type { CalendarEventCategory } from "@/config/calendar";
 import {
   byCategory,
@@ -94,7 +99,7 @@ function EventRow({
         className={[
           "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:border-indigo-300",
           past ? "border-indigo-50 opacity-50" : "border-indigo-100",
-          ongoing && event.category === "exam" ? "border-amber-300 bg-amber-50/60" : "bg-white",
+          ongoing && isExamCategory(event.category) ? "border-amber-300 bg-amber-50/60" : "bg-white",
         ].join(" ")}
       >
         <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
