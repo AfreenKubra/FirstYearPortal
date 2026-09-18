@@ -140,6 +140,8 @@ export type ComponentDef = { code: string; label: string; maxMarks: number };
 export type ColumnMap = {
   usnIndex: number;
   components: Array<{ index: number; code: string; label: string; maxMarks: number }>;
+  /** Both attendance columns, or neither — one without the other is an error. */
+  attendance: { heldIndex: number; attendedIndex: number } | null;
   /** Headers read from the sheet that matched nothing, shown so none vanish unnoticed. */
   ignored: string[];
 };
@@ -153,6 +155,15 @@ function normalise(header: string): string {
 }
 
 const USN_HEADERS = new Set(["usn", "usnno", "usnnumber", "regno", "registerno", "registrationno"]);
+
+// "Total" alone is deliberately absent: it is at least as likely to head a
+// marks total, and reading marks as classes held would be a silent disaster.
+const HELD_HEADERS = new Set([
+  "classesheld", "held", "classesconducted", "conducted", "totalclasses", "totalheld", "hoursheld",
+]);
+const ATTENDED_HEADERS = new Set([
+  "classesattended", "attended", "present", "classespresent", "attendedclasses", "hoursattended",
+]);
 
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th"];
 const WORD = ["", "first", "second", "third", "fourth", "fifth"];
@@ -176,6 +187,8 @@ export function mapColumns(
   components: readonly ComponentDef[],
 ): { ok: true; map: ColumnMap } | { ok: false; error: string } {
   let usnIndex = -1;
+  let heldIndex = -1;
+  let attendedIndex = -1;
   const matched: ColumnMap["components"] = [];
   const ignored: string[] = [];
   const claimed = new Set<string>();
@@ -186,6 +199,14 @@ export function mapColumns(
 
     if (usnIndex === -1 && USN_HEADERS.has(key)) {
       usnIndex = index;
+      return;
+    }
+    if (heldIndex === -1 && HELD_HEADERS.has(key)) {
+      heldIndex = index;
+      return;
+    }
+    if (attendedIndex === -1 && ATTENDED_HEADERS.has(key)) {
+      attendedIndex = index;
       return;
     }
 
@@ -202,15 +223,29 @@ export function mapColumns(
   if (usnIndex === -1) {
     return { ok: false, error: 'The first row needs a column headed "USN".' };
   }
-  if (matched.length === 0) {
+
+  // Half an attendance pair cannot become a percentage, and guessing the
+  // other half would put invented figures in front of a student.
+  if ((heldIndex === -1) !== (attendedIndex === -1)) {
+    return {
+      ok: false,
+      error:
+        heldIndex === -1
+          ? 'Found "Classes attended" but no "Classes held" column. Add both, or neither.'
+          : 'Found "Classes held" but no "Classes attended" column. Add both, or neither.',
+    };
+  }
+  const attendance = heldIndex === -1 ? null : { heldIndex, attendedIndex };
+
+  if (matched.length === 0 && !attendance) {
     const expected = components.map((c) => `"${c.label}"`).join(", ");
     return {
       ok: false,
-      error: `No marks column recognised. Head the columns with one of: ${expected}.`,
+      error: `No marks or attendance column recognised. Head the columns with one of: ${expected}, or "Classes held" and "Classes attended".`,
     };
   }
 
-  return { ok: true, map: { usnIndex, components: matched, ignored } };
+  return { ok: true, map: { usnIndex, components: matched, attendance, ignored } };
 }
 
 // --- The preview ------------------------------------------------------------
@@ -242,8 +277,23 @@ export type CellError = {
   message: string;
 };
 
+export type AttendanceFigures = { held: number; attended: number };
+
+/** The portal's current attendance, keyed by student id. */
+export type CurrentAttendance = ReadonlyMap<string, AttendanceFigures>;
+
+export type AttendanceChange = {
+  studentId: string;
+  usn: string;
+  fullName: string;
+  /** null: no attendance recorded in the portal yet. */
+  from: AttendanceFigures | null;
+  to: AttendanceFigures;
+};
+
 export type ImportPreview = {
   changes: Change[];
+  attendanceChanges: AttendanceChange[];
   /** Cells whose value already matches the portal. */
   unchanged: number;
   errors: CellError[];
@@ -261,15 +311,55 @@ const ABSENT = new Set(["ab", "absent", "a", "-", "na", "n/a"]);
 
 const cleanUsn = (usn: string) => usn.replace(/\s+/g, "").toUpperCase();
 
+const MAX_CLASSES = 500;
+
+/**
+ * One student's attendance pair, or a reason it cannot be read.
+ *
+ * Both blank: nothing to say yet, leave the portal alone. Held of zero: no
+ * class has run, so there is no percentage — also left alone rather than
+ * stored as 0 of 0. Anything else must be two whole numbers with attended
+ * no more than held.
+ */
+function readAttendance(
+  heldRaw: string,
+  attendedRaw: string,
+): { kind: "skip" } | { kind: "ok"; value: AttendanceFigures } | { kind: "error"; message: string } {
+  const held = heldRaw.trim();
+  const attended = attendedRaw.trim();
+
+  if (held === "" && attended === "") return { kind: "skip" };
+  if (held === "" || attended === "") {
+    return { kind: "error", message: "Give both classes held and classes attended, or leave both blank." };
+  }
+
+  const h = Number(held);
+  const a = Number(attended);
+  if (!Number.isInteger(h) || !Number.isInteger(a) || h < 0 || a < 0) {
+    return { kind: "error", message: "Classes held and attended must be whole numbers." };
+  }
+  if (h > MAX_CLASSES) {
+    return { kind: "error", message: `More than ${MAX_CLASSES} classes held is not a semester.` };
+  }
+  if (a > h) {
+    return { kind: "error", message: `Attended (${a}) is more than held (${h}).` };
+  }
+  if (h === 0) return { kind: "skip" };
+
+  return { kind: "ok", value: { held: h, attended: a } };
+}
+
 export function buildPreview(
   rows: readonly string[][],
   map: ColumnMap,
   roster: readonly RosterStudent[],
   current: CurrentMarks,
+  currentAttendance: CurrentAttendance = new Map(),
 ): ImportPreview {
   const byUsn = new Map(roster.map((s) => [cleanUsn(s.usn), s]));
   const seen = new Map<string, number>();
   const changes: Change[] = [];
+  const attendanceChanges: AttendanceChange[] = [];
   const errors: CellError[] = [];
   const notInClass: string[] = [];
   let unchanged = 0;
@@ -331,6 +421,35 @@ export function buildPreview(
         to,
       });
     }
+
+    if (map.attendance) {
+      const read = readAttendance(
+        cells[map.attendance.heldIndex] ?? "",
+        cells[map.attendance.attendedIndex] ?? "",
+      );
+      if (read.kind === "error") {
+        errors.push({
+          row: rowNumber,
+          usn,
+          componentLabel: "Attendance",
+          value: `${(cells[map.attendance.attendedIndex] ?? "").trim() || "—"} of ${(cells[map.attendance.heldIndex] ?? "").trim() || "—"}`,
+          message: read.message,
+        });
+      } else if (read.kind === "ok") {
+        const before = currentAttendance.get(student.id) ?? null;
+        if (before && before.held === read.value.held && before.attended === read.value.attended) {
+          unchanged += 1;
+        } else {
+          attendanceChanges.push({
+            studentId: student.id,
+            usn,
+            fullName: student.fullName,
+            from: before,
+            to: read.value,
+          });
+        }
+      }
+    }
   });
 
   const duplicates = [...seen.entries()].filter(([, n]) => n > 1).map(([u]) => u);
@@ -342,13 +461,17 @@ export function buildPreview(
 
   return {
     changes: safeChanges,
+    attendanceChanges: attendanceChanges.filter((c) => !dup.has(c.usn)),
     unchanged,
     errors,
     notInClass: [...new Set(notInClass)],
     duplicates,
     missingFromSheet: roster.filter((s) => !seen.has(cleanUsn(s.usn))).length,
     ignoredColumns: map.ignored,
-    readColumns: map.components.map((c) => c.label),
+    readColumns: [
+      ...map.components.map((c) => c.label),
+      ...(map.attendance ? ["Classes held", "Classes attended"] : []),
+    ],
   };
 }
 
@@ -357,6 +480,6 @@ export function isImportable(preview: ImportPreview): boolean {
   return (
     preview.errors.length === 0 &&
     preview.duplicates.length === 0 &&
-    preview.changes.length > 0
+    preview.changes.length + preview.attendanceChanges.length > 0
   );
 }

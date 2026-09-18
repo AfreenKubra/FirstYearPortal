@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/ui/FormStatus";
 import { useActionState } from "@/lib/actions/use-action-state";
 import { runSheetImport, type SheetImportState } from "@/lib/actions/marks-sheet";
 import { isImportable, type ImportPreview } from "@/lib/marks/sheet-import";
+import { attendancePercent } from "@/lib/attendance/summary";
 
 const IDLE: SheetImportState = { status: "idle", message: null };
 
@@ -15,6 +16,15 @@ function storageKey(subjectId: string) {
 
 function mark(value: number | null) {
   return value === null ? "—" : String(value);
+}
+
+function totalChanges(preview: ImportPreview) {
+  return preview.changes.length + preview.attendanceChanges.length;
+}
+
+function attendanceCell(figures: { held: number; attended: number } | null) {
+  if (!figures) return "—";
+  return `${figures.attended} / ${figures.held} · ${attendancePercent(figures.attended, figures.held)}%`;
 }
 
 /**
@@ -82,6 +92,12 @@ export function SheetImportPanel({
               removes any mark.
             </li>
             <li>
+              For attendance, add <strong>Classes held</strong> and{" "}
+              <strong>Classes attended</strong> columns — both, as whole
+              numbers. Attendance is visible to students as soon as you
+              import; marks wait until you release them.
+            </li>
+            <li>
               Share → General access → <strong>Anyone with the link</strong> →
               Viewer. Open this subject&apos;s tab and copy the address bar.
             </li>
@@ -116,7 +132,7 @@ export function SheetImportPanel({
             </SubmitButton>
             {preview && isImportable(preview) && (
               <SubmitButton name="intent" value="import" pendingLabel="Importing…">
-                Import {preview.changes.length} change{preview.changes.length === 1 ? "" : "s"}
+                Import {totalChanges(preview)} change{totalChanges(preview) === 1 ? "" : "s"}
               </SubmitButton>
             )}
           </div>
@@ -151,9 +167,9 @@ function PreviewReport({ preview }: { preview: ImportPreview }) {
     <div className="space-y-4 border-t border-indigo-100 pt-4">
       <p className="text-sm text-ink">
         Read <strong>{preview.readColumns.join(", ")}</strong>.{" "}
-        <strong className="tabular-nums">{preview.changes.length}</strong> to change,{" "}
+        <strong className="tabular-nums">{totalChanges(preview)}</strong> to change,{" "}
         <span className="tabular-nums">{preview.unchanged}</span> already match.
-        {preview.changes.length === 0 && !blocked && " Nothing to import — the portal already matches the sheet."}
+        {totalChanges(preview) === 0 && !blocked && " Nothing to import — the portal already matches the sheet."}
       </p>
 
       {preview.errors.length > 0 && (
@@ -201,6 +217,34 @@ function PreviewReport({ preview }: { preview: ImportPreview }) {
                   <td className="py-2 text-right tabular-nums font-medium text-indigo-950">
                     {c.to === null ? "Absent (removed)" : c.to}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {preview.attendanceChanges.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption className="mb-1.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              Attendance
+            </caption>
+            <thead>
+              <tr className="border-b border-indigo-100 text-xs uppercase tracking-wide text-ink-faint">
+                <th scope="col" className="py-2 pr-3 font-medium">USN</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Name</th>
+                <th scope="col" className="py-2 pr-3 text-right font-medium">Now</th>
+                <th scope="col" className="py-2 text-right font-medium">After import</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.attendanceChanges.map((c) => (
+                <tr key={c.studentId} className="border-b border-indigo-50">
+                  <td className="py-2 pr-3 font-mono text-xs text-ink-muted">{c.usn}</td>
+                  <td className="py-2 pr-3 text-ink">{c.fullName}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink-faint">{attendanceCell(c.from)}</td>
+                  <td className="py-2 text-right tabular-nums font-medium text-indigo-950">{attendanceCell(c.to)}</td>
                 </tr>
               ))}
             </tbody>

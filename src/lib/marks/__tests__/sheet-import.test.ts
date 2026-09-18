@@ -200,3 +200,81 @@ describe("buildPreview", () => {
     expect(p.errors[0].row).toBe(3);
   });
 });
+
+describe("attendance columns", () => {
+  function attendancePreview(
+    csv: string,
+    current: Array<[string, { held: number; attended: number }]> = [],
+  ) {
+    const rows = parseCsv(csv);
+    const mapped = mapColumns(rows[0], COMPONENTS);
+    if (!mapped.ok) throw new Error(mapped.error);
+    return buildPreview(rows, mapped.map, ROSTER, new Map(), new Map(current));
+  }
+
+  it("recognises classes held and attended alongside the marks", () => {
+    const result = mapColumns(["USN", "1st IA", "Classes held", "Classes attended"], COMPONENTS);
+    expect(result.ok && result.map.attendance).toEqual({ heldIndex: 2, attendedIndex: 3 });
+  });
+
+  it("accepts a sheet that carries attendance and no marks", () => {
+    const result = mapColumns(["USN", "Classes conducted", "Present"], COMPONENTS);
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses one attendance column without the other", () => {
+    const result = mapColumns(["USN", "1st IA", "Classes held"], COMPONENTS);
+    expect(result.ok).toBe(false);
+  });
+
+  it("never reads a bare 'Total' as classes held", () => {
+    // A "Total" column is at least as likely to be a marks total.
+    const result = mapColumns(["USN", "1st IA", "Total", "Classes attended"], COMPONENTS);
+    expect(result.ok).toBe(false);
+  });
+
+  it("turns the pair into a change against what the portal holds", () => {
+    const p = attendancePreview(
+      "USN,Classes held,Classes attended\n1HK25AI001,42,39",
+      [["s1", { held: 40, attended: 37 }]],
+    );
+    expect(p.attendanceChanges).toEqual([
+      expect.objectContaining({
+        usn: "1HK25AI001",
+        from: { held: 40, attended: 37 },
+        to: { held: 42, attended: 39 },
+      }),
+    ]);
+    expect(isImportable(p)).toBe(true);
+  });
+
+  it("leaves attendance alone when both cells are blank", () => {
+    const p = attendancePreview("USN,Classes held,Classes attended\n1HK25AI001,,");
+    expect(p.attendanceChanges).toEqual([]);
+    expect(p.errors).toEqual([]);
+  });
+
+  it("stores nothing before the first class is held", () => {
+    // 0 of 0 has no percentage; the table would refuse it anyway.
+    const p = attendancePreview("USN,Classes held,Classes attended\n1HK25AI001,0,0");
+    expect(p.attendanceChanges).toEqual([]);
+    expect(p.errors).toEqual([]);
+  });
+
+  it("blocks on attended above held, half a pair, or fractions", () => {
+    const p = attendancePreview(
+      "USN,Classes held,Classes attended\n1HK25AI001,40,41\n1HK25AI002,40,\n1HK25AI003,40.5,30",
+    );
+    expect(p.errors.map((e) => e.usn)).toEqual(["1HK25AI001", "1HK25AI002", "1HK25AI003"]);
+    expect(isImportable(p)).toBe(false);
+  });
+
+  it("counts an unchanged pair as unchanged", () => {
+    const p = attendancePreview(
+      "USN,Classes held,Classes attended\n1HK25AI001,42,39",
+      [["s1", { held: 42, attended: 39 }]],
+    );
+    expect(p.attendanceChanges).toEqual([]);
+    expect(p.unchanged).toBe(1);
+  });
+});

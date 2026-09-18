@@ -247,6 +247,11 @@ const CHECKS = [
     probe: () => columnExists("assessments", "semester_min"),
   },
   {
+    migration: "0045_subject_attendance.sql",
+    label: "class attendance per subject",
+    probe: () => tableExists("student_subject_attendance"),
+  },
+  {
     migration: "0043_calendar_cie_see.sql",
     label: "CIE and SEE calendar categories",
     probe: async () => {

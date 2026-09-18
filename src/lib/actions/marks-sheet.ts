@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getOwnStaff } from "@/lib/queries/faculty";
 import { getMarksGrid } from "@/lib/queries/marks";
+import { getSubjectAttendance } from "@/lib/queries/attendance";
 import {
   buildPreview,
   csvExportUrl,
@@ -135,11 +136,19 @@ async function buildFromSheet(
     }
   }
 
+  const currentAttendance = mapped.map.attendance
+    ? await getSubjectAttendance(
+        subjectId,
+        grid.students.map((s) => s.studentId),
+      )
+    : new Map();
+
   const preview = buildPreview(
     rows,
     mapped.map,
     grid.students.map((s) => ({ id: s.studentId, usn: s.usn, fullName: s.fullName })),
     current,
+    currentAttendance,
   );
 
   return { ok: true, preview, fingerprint: fingerprintOf(fetched.csv) };
@@ -258,6 +267,29 @@ export async function applySheetImport(
       .eq("component_code", change.componentCode);
   }
 
+  if (preview.attendanceChanges.length > 0) {
+    const { error } = await supabase.from("student_subject_attendance").upsert(
+      preview.attendanceChanges.map((c) => ({
+        student_id: c.studentId,
+        subject_id: subjectId,
+        classes_held: c.to.held,
+        classes_attended: c.to.attended,
+      })),
+      { onConflict: "student_id,subject_id" },
+    );
+
+    if (error) {
+      return {
+        status: "error",
+        message:
+          toSet.length + toRemove.length > 0
+            ? "Marks were imported, but attendance could not be saved. Only the subject's assigned teacher, the head of department, and administrators may record it."
+            : "Could not save attendance. Only the subject's assigned teacher, the head of department, and administrators may record it.",
+        sheetUrl,
+      };
+    }
+  }
+
   try {
     const {
       data: { user },
@@ -271,6 +303,7 @@ export async function applySheetImport(
         faculty_id: staff.id,
         recorded: toSet.length,
         removed: toRemove.length,
+        attendance: preview.attendanceChanges.length,
         fingerprint: built.fingerprint,
       },
     });
@@ -281,12 +314,23 @@ export async function applySheetImport(
   revalidatePath("/faculty/marks");
   revalidatePath("/hod/marks");
 
-  const parts = [`${toSet.length} mark${toSet.length === 1 ? "" : "s"} imported`];
+  revalidatePath("/dashboard");
+
+  const parts: string[] = [];
+  if (toSet.length > 0) parts.push(`${toSet.length} mark${toSet.length === 1 ? "" : "s"} imported`);
   if (toRemove.length > 0) parts.push(`${toRemove.length} removed as absent`);
+  const attendanceCount = preview.attendanceChanges.length;
+  if (attendanceCount > 0) {
+    parts.push(`attendance updated for ${attendanceCount} student${attendanceCount === 1 ? "" : "s"}`);
+  }
+
+  const notes: string[] = [];
+  if (toSet.length + toRemove.length > 0) notes.push("Marks show to students once you release them");
+  if (attendanceCount > 0) notes.push("attendance is visible to them now");
 
   return {
     status: "done",
-    message: `${parts.join(", ")}. Students see a component only once you release it.`,
+    message: `${parts.join(", ")}. ${notes.join("; ")}.`,
     sheetUrl,
   };
 }

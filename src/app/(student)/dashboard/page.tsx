@@ -38,6 +38,9 @@ import { UpcomingExaminationsWidget } from "@/components/dashboard/UpcomingExami
 import Link from "next/link";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { StudentMarksTable } from "@/components/marks/StudentMarksTable";
+import { AttendanceCard } from "@/components/dashboard/AttendanceCard";
+import { getOwnAttendance } from "@/lib/queries/attendance";
+import { summariseAttendance } from "@/lib/attendance/summary";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -96,10 +99,11 @@ export default async function DashboardPage() {
   const domains = nameById(lookups.domains, snapshot.domainIds);
 
   const greetingName = formatGreetingName(student.fullName, student.usn);
-  const [profilePhotoUrl, markComponents, subjectMarks] = await Promise.all([
+  const [profilePhotoUrl, markComponents, subjectMarks, attendanceRows] = await Promise.all([
     getProfilePhotoUrl(student.profilePhotoPath),
     listMarkComponents(),
     getStudentMarks(student.id, student.departmentCode, academic?.semester ?? null),
+    getOwnAttendance(student.id),
   ]);
 
   // Three real sources, merged into one calendar: the official college
@@ -314,6 +318,8 @@ export default async function DashboardPage() {
             components={markComponents}
             subjects={subjectMarks}
           />
+
+          <AttendanceCard summary={summariseAttendance(attendanceRows)} />
         </div>
 
         <div className="space-y-6">

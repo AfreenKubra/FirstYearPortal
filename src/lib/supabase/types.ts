@@ -446,6 +446,28 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      student_subject_attendance: {
+        Row: {
+          student_id: string;
+          subject_id: string;
+          classes_held: number;
+          classes_attended: number;
+          entered_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          student_id: string;
+          subject_id: string;
+          classes_held: number;
+          classes_attended: number;
+        };
+        Update: Partial<{
+          classes_held: number;
+          classes_attended: number;
+        }>;
+        Relationships: [];
+      };
       external_test_scores: {
         Row: {
           id: string;

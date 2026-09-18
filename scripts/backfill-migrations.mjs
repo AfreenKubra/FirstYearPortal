@@ -167,6 +167,10 @@ const SIGNATURES = [
          and column_name='profile_photo_url')`,
   ],
   [
+    "0045_subject_attendance.sql",
+    `select to_regclass('public.student_subject_attendance') is not null`,
+  ],
+  [
     "0043_calendar_cie_see.sql",
     `select exists (select 1 from pg_enum e join pg_type t on t.oid=e.enumtypid
        where t.typname='calendar_event_category' and e.enumlabel='see')`,
